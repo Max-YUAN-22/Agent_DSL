@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Scenario Orchestrator - Multi-Agent DSL</title>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif; margin:0; background:#f7f9fc; color:#222; }
+    .nav { position:sticky; top:0; z-index:10; background:#0b1020; color:#e2e8f0; }
+    .nav-inner { max-width:1100px; margin:0 auto; display:flex; align-items:center; justify-content:space-between; padding:10px 16px; }
+    .nav a { color:#e2e8f0; text-decoration:none; margin-right:14px; font-weight:600; }
+    .nav .brand { color:#a5b4fc; font-weight:800; }
+
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .header { text-align:center; margin-bottom: 16px; }
+    h1 { margin: 8px 0; color:#111827; }
+    .desc { color:#555; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-top: 20px; }
+    .card { background:#fff; border-radius:12px; padding:16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+    .title { font-weight:600; margin-bottom:10px; color:#4f46e5; }
+    .btn { padding:8px 12px; border:none; border-radius:6px; background:#4f46e5; color:#fff; cursor:pointer; font-weight:600; margin-right:8px; }
+    .btn.secondary { background:#64748b; }
+    .btn.ghost { background:#e2e8f0; color:#111827; }
+    .scenario-tags { display:flex; gap:8px; flex-wrap:wrap; }
+    .tag { padding:6px 10px; border-radius:14px; background:#eef2ff; color:#3730a3; cursor:pointer; transition: transform .15s ease, box-shadow .15s ease, opacity .15s ease; }
+    .tag:hover { transform: translateY(-1px); box-shadow: 0 4px 12px rgba(79,70,229,.25); }
+    .code { background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    .back { display:inline-block; margin-top:12px; text-decoration:none; color:#4f46e5; font-weight:600; }
+    .list { color:#444; }
+    .toplink { text-align:left; margin-bottom:8px; }
+    .toplink a { color:#4f46e5; text-decoration:none; font-weight:700; }
+    .status-strip { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:8px; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:14px; background:#eef2ff; color:#3730a3; font-weight:700; }
+    @keyframes bump { 0%{ transform:scale(1); } 50%{ transform:scale(1.06); } 100%{ transform:scale(1); } }
+    .bump { animation: bump .35s ease; }
+
+    .progress-row { display:flex; align-items:center; gap:10px; margin:8px 0; }
+    .progress-label { width:140px; font-weight:600; color:#334155; }
+    .progress-bar { position:relative; flex:1; height:10px; background:#e5e7eb; border-radius:999px; overflow:hidden; }
+    .progress-fill { position:absolute; left:0; top:0; height:100%; width:0%; background:linear-gradient(90deg, #4f46e5, #06b6d4); transition: width .25s ease; }
+    .progress-pct { width:48px; text-align:right; color:#475569; font-variant-numeric: tabular-nums; }
+
+    .mini-cards { display:grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap:12px; }
+    .mini { background:#0b1020; color:#e2e8f0; border-radius:10px; padding:12px; position:relative; overflow:hidden; }
+    .mini .name { font-weight:800; color:#a5b4fc; margin-bottom:6px; }
+    .mini .kv { font-size:12px; color:#cbd5e1; display:flex; gap:10px; flex-wrap:wrap; }
+    .pulse { position:absolute; inset:0; pointer-events:none; opacity:0; transition: opacity .25s ease; }
+    .mini.active .pulse { opacity:.18; background: radial-gradient(600px 120px at var(--px,50%) var(--py,50%), #a5b4fc, transparent 40%); }
+    .mini .retry { color:#f97316; font-weight:700; }
+    .hl { background:#fde68a; color:#7c2d12; border-radius:4px; padding:0 3px; }
+  </style>
+</head>
+<body>
+  <div class="nav">
+    <div class="nav-inner">
+      <div class="brand">DSL Orchestrator</div>
+      <div>
+        <a href="/DSL-Multiagent/index.html">Home</a>
+        <a href="/DSL-Multiagent/standalone_demo_dashboard.html">Dashboard</a>
+        <a href="/DSL-Multiagent/dsl_primitives_demo.html">Primitives</a>
+        <a href="/DSL-Multiagent/about.html">About</a>
+      </div>
+    </div>
+  </div>
+
+  <div class="container">
+    <div class="header">
+      <div class="toplink"><a href="/DSL-Multiagent/index.html">← Back to Home</a></div>
+      <h1>Scenario Orchestrator</h1>
+      <div class="desc">One DSL, seven scenarios. Reuse ATSLP/HCMPL/CALK primitives to coordinate multi-agent workflows across domains.</div>
+      <div class="status-strip"><span id="statusSel" class="badge">Selected: 0</span><span id="statusTasks" class="badge">Planned tasks: 0</span></div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">Select Scenarios</div>
+        <div class="scenario-tags" id="scenarioTags"></div>
+        <div style="margin-top:10px;">
+          <button class="btn" id="runPlan">Generate Orchestration Plan</button>
+          <button class="btn secondary" id="copyPlan">Copy Plan</button>
+          <button class="btn secondary" id="exportDSL">Export DSL</button>
+          <button class="btn secondary" id="exportJSON">Export JSON</button>
+          <button class="btn ghost" id="clearSel">Clear</button>
+        </div>
+        <div style="margin-top:10px;" id="preview"></div>
+      </div>
+
+      <div class="card">
+        <div class="title">Reusable DSL Plan</div>
+        <pre id="dslPlan" class="code">// Select scenarios and click "Generate Orchestration Plan"</pre>
+        <div class="input-row" style="display:flex; gap:8px; align-items:center; margin-top:8px;">
+          <input id="logFilter" placeholder="Filter log (e.g., SLA or CALK)" style="flex:1; padding:8px; border:1px solid #e5e7eb; border-radius:6px;" />
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+            <input type="checkbox" id="hlSLA" checked /> highlight SLA
+          </label>
+          <label style="display:flex; align-items:center; gap:6px; font-size:12px;">
+            <input type="checkbox" id="hlCALK" checked /> highlight CALK
+          </label>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Central Collaboration Log</div>
+        <pre id="collabLog" class="code">// Cross-scenario master–sub agent communications will appear here</pre>
+      </div>
+
+      <div class="card">
+        <div class="title">Execution Simulation</div>
+        <div style="margin-bottom:8px;">
+          <button class="btn" id="startSim">Start Simulation</button>
+          <button class="btn secondary" id="stopSim">Stop</button>
+        </div>
+        <div id="simRows"></div>
+      </div>
+
+      <div class="card">
+        <div class="title">Scenario Execution Cards</div>
+        <div id="miniCards" class="mini-cards"></div>
+      </div>
+
+      <div class="card">
+        <div class="title">Quick Links</div>
+        <ul class="list">
+          <li><a href="/DSL-Multiagent/index.html">Home</a></li>
+          <li><a href="/DSL-Multiagent/standalone_demo_dashboard.html">Performance Dashboard</a></li>
+          <li><a href="/DSL-Multiagent/about.html">About DSL Framework</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const scenarios = [
+      { id:'emergency', name:'Emergency', tasks:['detect_incident','dispatch_team','coordinate_handover'] },
+      { id:'wildfire', name:'Wildfire', tasks:['detect_hotspots','plan_routes','deploy_resources'] },
+      { id:'smartgrid', name:'Smart Grid', tasks:['isolate_fault','reconfigure_switches','verify_voltage'] },
+      { id:'healthcare', name:'Healthcare', tasks:['triage','route','allocate_resource'] },
+      { id:'traffic', name:'Traffic', tasks:['detect_incident','optimize_signals','reroute'] },
+      { id:'warehouse', name:'Warehouse', tasks:['assign','balance_load','scan_tile'] },
+      { id:'usar', name:'Urban Search & Rescue', tasks:['assign','clear_path','dispatch'] }
+    ];
+
+    const tagsEl = document.getElementById('scenarioTags');
+    const selected = new Set();
+    scenarios.forEach(s => {
+      const el = document.createElement('div'); el.className='tag'; el.textContent=s.name; el.dataset.id=s.id;
+      el.addEventListener('click', (ev)=>{ if(selected.has(s.id)) selected.delete(s.id); else selected.add(s.id); el.style.opacity = selected.has(s.id)?'1':'0.5'; updateStatus(); renderPreview(); el.classList.add('bump'); setTimeout(()=>el.classList.remove('bump'),350); });
+      el.style.opacity = '0.5';
+      tagsEl.appendChild(el);
+    });
+
+    function updateStatus(){ const ss=document.getElementById('statusSel'); ss.textContent = `Selected: ${selected.size}`; ss.classList.add('bump'); setTimeout(()=>ss.classList.remove('bump'),350); }
+
+    function renderPreview(){ const p=document.getElementById('preview'); const ch=[...selected].map(id=>scenarios.find(s=>s.id===id).name); p.innerHTML = ch.length? `<span class="badge">${ch.join(' · ')}</span>` : '<span class="badge">No scenarios selected</span>'; }
+
+    document.getElementById('clearSel').addEventListener('click', ()=>{ selected.clear(); [...tagsEl.children].forEach(el=>el.style.opacity='0.5'); updateStatus(); renderPreview(); buildSimRows([]); buildMiniCards([]); document.getElementById('dslPlan').textContent='// Cleared selection'; document.getElementById('collabLog').textContent='// Selection cleared'; });
+
+    document.getElementById('runPlan').addEventListener('click', () => {
+      const planEl = document.getElementById('dslPlan');
+      const logEl = document.getElementById('collabLog');
+      const chosen = scenarios.filter(s => selected.has(s.id));
+      if (chosen.length === 0) { planEl.textContent='// No scenarios selected'; logEl.textContent='// Select scenarios to orchestrate collaboration'; buildSimRows([]); buildMiniCards([]); return; }
+
+      const lines = [];
+      lines.push('// ATSLP: schedule cross-scenario tasks');
+      lines.push('schedule_tasks([');
+      chosen.forEach((s, idx) => {
+        const t = s.tasks[0];
+        lines.push(`  ${t}(scenario=${s.id}${idx+1}),`);
+      });
+      lines.push('])');
+      lines.push('\n// HCMPL: cache shared artifacts (maps, occupancy, flow)');
+      chosen.forEach((s, idx) => {
+        lines.push(`cache_store(key="${s.id}_artifact@t", data=compute_${s.id}_artifact(${idx+1}))`);
+        lines.push(`artifact_${s.id}${idx+1} = cache_get(key="${s.id}_artifact@t")`);
+      });
+      lines.push('\n// CALK: broadcast cross-scenario alerts');
+      chosen.forEach((s, idx) => {
+        lines.push(`broadcast({ scenario: "${s.id}", event: "ready", shard: ${idx+1} })`);
+      });
+      planEl.textContent = lines.join('\n');
+
+      const log = [];
+      chosen.forEach((s, idx) => {
+        log.push(`[t${idx}] Master → ${s.name}: ${s.tasks[0]}(...)`);
+        log.push(`[t${idx}] ${s.name} → Master: observation_ack`);
+        log.push(`[t${idx+1}] Master → ${s.name}: ${s.tasks[1] || 'plan'}(...)`);
+        log.push(`[t${idx+1}] ${s.name} → Master: action_dispatched`);
+        log.push(`[t${idx+2}] Master → ${s.name}: ${s.tasks[2] || 'verify'}(...)`);
+        log.push(`[t${idx+2}] ${s.name} → Master: completed`);
+        // SLA/CALK examples
+        log.push(`[t${idx+2}] SLA check ${s.id}: within_threshold=true`);
+        log.push(`[t${idx+2}] CALK sync ${s.id}: broadcast_policy_update`);
+      });
+      logEl.textContent = log.join('\n');
+
+      const st=document.getElementById('statusTasks'); st.textContent = `Planned tasks: ${chosen.length*3}`; st.classList.add('bump'); setTimeout(()=>st.classList.remove('bump'),350);
+
+      buildSimRows(chosen);
+      buildMiniCards(chosen);
+      applyLogFilterAndHighlight();
+    });
+
+    document.getElementById('copyPlan').addEventListener('click', async ()=>{
+      const text=document.getElementById('dslPlan').textContent; try{ await navigator.clipboard.writeText(text); const st=document.getElementById('statusTasks'); st.textContent='Plan copied'; st.classList.add('bump'); setTimeout(()=>{ st.textContent=`Planned tasks: ${selected.size*3||0}`; st.classList.remove('bump'); },800);}catch(e){}
+    });
+
+    document.getElementById('exportDSL').addEventListener('click', ()=>{
+      const content=document.getElementById('dslPlan').textContent || '';
+      downloadFile('orchestration.dsl.txt', content);
+    });
+
+    document.getElementById('exportJSON').addEventListener('click', ()=>{
+      const chosen = scenarios.filter(s => selected.has(s.id));
+      const json = { selected: chosen.map(s=>s.id), plan: document.getElementById('dslPlan').textContent.split('\n') };
+      downloadFile('orchestration.plan.json', JSON.stringify(json, null, 2));
+    });
+
+    function downloadFile(filename, content){
+      const blob=new Blob([content], {type:'text/plain;charset=utf-8'});
+      const url=URL.createObjectURL(blob); const a=document.createElement('a'); a.href=url; a.download=filename; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+    }
+
+    // Simulation
+    let simTimer=null; let simStates=[];
+
+    function buildSimRows(chosen){
+      const host=document.getElementById('simRows'); host.innerHTML=''; simStates=[]; if(!chosen || chosen.length===0){ return; }
+      chosen.forEach(s=>{
+        const row=document.createElement('div'); row.className='progress-row';
+        row.innerHTML = `<div class=\"progress-label\">${s.name}</div><div class=\"progress-bar\"><div class=\"progress-fill\"></div></div><div class=\"progress-pct\">0%</div>`;
+        host.appendChild(row);
+        simStates.push({ id:s.id, name:s.name, el:row, progress:0, step:0, done:false, retries:0 });
+      });
+    }
+
+    document.getElementById('startSim').addEventListener('click', ()=>{
+      const chosen = scenarios.filter(s => selected.has(s.id));
+      if(chosen.length===0){ return; }
+      if(simTimer){ clearInterval(simTimer); }
+      simStates.forEach(st=>{ st.progress=0; st.step=0; st.done=false; st.retries=0; const fill=st.el.querySelector('.progress-fill'); const pct=st.el.querySelector('.progress-pct'); fill.style.width='0%'; pct.textContent='0%'; });
+      const logEl=document.getElementById('collabLog');
+      logEl.textContent += `\n[t${Date.now()%1000}] Master → All: begin_orchestration(${chosen.length} scenarios)`;
+
+      simTimer=setInterval(()=>{
+        let allDone=true;
+        simStates.forEach(st=>{
+          if(st.done) return;
+          allDone=false;
+          // random transient failure with retry
+          if(Math.random()<0.05){ st.retries++; appendMiniEvent(st.id, `retry#${st.retries} due to transient_error`); logEl.textContent += `\n[t${Date.now()%1000}] ${st.name}: transient_error · retry(${st.retries})`; return; }
+          const delta = Math.min(100-st.progress, Math.ceil(Math.random()*7));
+          st.progress += delta;
+          if(st.progress>=100){ st.progress=100; st.done=true; }
+          const fill=st.el.querySelector('.progress-fill'); const pct=st.el.querySelector('.progress-pct');
+          fill.style.width = st.progress+'%'; pct.textContent = st.progress+'%';
+          if(st.progress===100){
+            appendMiniEvent(st.id, 'completed');
+            logEl.textContent += `\n[t${Date.now()%1000}] ${st.name} → Master: completed`;
+          } else if(st.progress%25<delta){
+            appendMiniEvent(st.id, `progress ${st.progress}%`);
+            logEl.textContent += `\n[t${Date.now()%1000}] ${st.name}: progress ${st.progress}%`;
+          }
+        });
+        if(allDone){
+          clearInterval(simTimer); simTimer=null;
+          logEl.textContent += `\n[t${Date.now()%1000}] Master: orchestration_complete`;
+          applyLogFilterAndHighlight();
+        }
+      }, 500);
+    });
+
+    document.getElementById('stopSim').addEventListener('click', ()=>{
+      if(simTimer){ clearInterval(simTimer); simTimer=null; const logEl=document.getElementById('collabLog'); logEl.textContent += `\n[t${Date.now()%1000}] Master: orchestration_paused`; }
+    });
+
+    // Mini-cards
+    const miniHost = document.getElementById('miniCards');
+    const miniById = new Map();
+    function buildMiniCards(chosen){ miniHost.innerHTML=''; miniById.clear(); if(!chosen) return; chosen.forEach(s=>{ const el=document.createElement('div'); el.className='mini'; el.dataset.id=s.id; el.innerHTML = `<div class=\"name\">${s.name}</div><div class=\"kv\"><span>status:<b> idle</b></span><span>retries:<b class=\"retry\">0</b></span></div><div class=\"pulse\"></div>`; miniHost.appendChild(el); miniById.set(s.id, { el, retries:0 }); el.addEventListener('mousemove', e=>{ el.style.setProperty('--px', e.offsetX+'px'); el.style.setProperty('--py', e.offsetY+'px'); }); }); }
+    function appendMiniEvent(id, text){ const m=miniById.get(id); if(!m) return; const stSpan = m.el.querySelector('.kv span b'); const rSpan=m.el.querySelector('.retry'); if(text.startsWith('retry#')){ m.retries++; rSpan.textContent=m.retries; } stSpan.textContent = ' ' + text; m.el.classList.add('active'); setTimeout(()=>m.el.classList.remove('active'), 400); }
+
+    // Log filter and highlight
+    const logInput=document.getElementById('logFilter'); const hlSLA=document.getElementById('hlSLA'); const hlCALK=document.getElementById('hlCALK');
+    function applyLogFilterAndHighlight(){ const raw = document.getElementById('collabLog').textContent.split('\n'); const kw = (logInput.value||'').trim().toLowerCase(); const out = raw.filter(line=> !kw || line.toLowerCase().includes(kw)).map(line=>{ let esc=line.replace(/&/g,'&amp;').replace(/</g,'&lt;'); if(hlSLA.checked){ esc = esc.replace(/SLA/gi, '<span class=\"hl\">$&</span>'); } if(hlCALK.checked){ esc = esc.replace(/CALK/gi, '<span class=\"hl\">$&</span>'); } return esc; }); document.getElementById('collabLog').innerHTML = out.join('\n'); }
+    logInput.addEventListener('input', applyLogFilterAndHighlight);
+    hlSLA.addEventListener('change', applyLogFilterAndHighlight);
+    hlCALK.addEventListener('change', applyLogFilterAndHighlight);
+
+    document.getElementById('copyPlan').addEventListener('mouseenter', (e)=>{ /* small UX pulse on nav */ });
+  </script>
+</body>
+</html>

@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Traffic Management - Multi-Agent DSL Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="realtime-enhancements.js" defer></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif; margin:0; background:#f7f9fc; color:#222; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .header { text-align:center; margin-bottom: 16px; }
+    h1 { margin: 8px 0; }
+    .desc { color:#555; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-top: 20px; }
+    .grid3 { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
+    .card, .spec-card { background:#fff; border-radius:12px; padding:16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+    .title { font-weight:600; margin-bottom:10px; color:#ef4444; }
+    .back { display:inline-block; margin-top:12px; text-decoration:none; color:#ef4444; font-weight:600; }
+    .list { margin:0; padding-left:18px; color:#444; }
+    canvas { max-width:100%; }
+    .code { background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    .input-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .btn { padding:8px 12px; border:none; border-radius:6px; background:#ef4444; color:#fff; cursor:pointer; font-weight:600; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:14px; background:#fee2e2; color:#991b1b; font-weight:700; }
+    pre.raw { background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; max-height:260px; overflow:auto; }
+    .emoji { font-size:1.05em; }
+    .status-strip { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:8px; }
+    .toplink { text-align:left; margin-bottom:10px; }
+    .toplink a { color:#ef4444; text-decoration:none; font-weight:700; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="toplink"><a href="/DSL-Multiagent/index.html">← Back to Home</a></div>
+      <h1>Traffic Management</h1>
+      <div class="desc">Incident detection, signal optimization, and congestion mitigation.</div>
+      <div class="status-strip"><span class="badge" id="statusDelay">⏱️ delay: 0.0s</span><span class="badge" id="statusInc">🚨 incidents: 0</span></div>
+    </div>
+
+    <div class="card">
+      <div class="title">🎯 Goals · Roles · I/O</div>
+      <div class="grid3">
+        <div class="spec-card">
+          <h4>Goals</h4>
+          <ul class="list">
+            <li>⏱️ Reduce average delay (s/veh)</li>
+            <li>🚨 Fast incident response</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Roles & Agents</h4>
+          <ul class="list">
+            <li>🚦 Signal controllers: route timing</li>
+            <li>🧑‍💼 Dispatcher: blackboard share; reroute</li>
+            <li>🚗 Vehicles: follow phases</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Inputs / Outputs / Ops</h4>
+          <ul class="list">
+            <li>Inputs: 🚗 flow · 🚨 incidents · 🟢🔴 phases</li>
+            <li>Outputs: 🔁 timing plans · 🚓 response</li>
+            <li>Ops: route (timing) → blackboard incidents</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div id="interactive" class="grid">
+      <div class="card">
+        <div class="title">Flow Timeline</div>
+        <canvas id="flowChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">Agent Activity</div>
+        <canvas id="activityChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">DSL Showcase</div>
+        <div class="code"><pre>// ATSLP: Detect incidents and adjust signals
+schedule_tasks([
+  detect_incident(road=A12),
+  optimize_signals(intersection=I7),
+  reroute(segment=S3, target=B)
+])
+
+// HCMPL: Cache flow matrices
+cache_store(key="flow@I7@t", data=measure_flow(I7))
+flow = cache_get(key="flow@I7@t")
+
+// CALK: Share city-wide alerts
+broadcast({ incident: "accident", location: I7 })</pre></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">Multi-Intersection Controller</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <button class="btn" id="tickBtn">Tick</button>
+          <button class="btn" id="incidentBtn">Report Incident</button>
+          <button class="btn" id="rerouteBtn">Reroute</button>
+          <span class="badge" id="avgDelay">⏱️ delay: 0.0s</span>
+          <span class="badge" id="incCount">🚨 incidents: 0</span>
+        </div>
+        <canvas id="netCanvas" width="600" height="320" style="background:#f1f5f9;border-radius:8px;"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">Blackboard Stream</div>
+        <pre class="raw" id="bbStream">(empty)</pre>
+      </div>
+
+      <div class="card">
+        <div class="title">Video Analysis (Beta)</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <input type="file" id="videoFile" accept="video/*" />
+          <input type="text" id="videoUrl" placeholder="Paste video URL (MP4/MOV/WebM)" />
+          <button class="btn" id="loadUrlBtn">Load</button>
+          <button class="btn" id="sample1">Sample 1</button>
+          <button class="btn" id="sample2">Sample 2</button>
+          <button class="btn" id="sample3">Sample 3</button>
+          <button class="btn" id="clearBtn" style="background:#64748b;">Clear</button>
+        </div>
+        <video id="video" controls></video>
+        <canvas id="hiddenCanvas" style="display:none;"></canvas>
+        <div style="margin-top:10px;">
+          <canvas id="motionChart" height="120"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Performance Snapshot</div>
+        <ul class="list">
+          <li>Throughput: 2.3 tasks/s</li>
+          <li>Avg Latency: 0.79s</li>
+          <li>Success Rate: 100%</li>
+        </ul>
+        <a class="back" href="/DSL-Multiagent/index.html">← Back to Home</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      new Chart(document.getElementById('flowChart'), { type:'line', data:{ labels:['t0','t1','t2','t3','t4','t5'], datasets:[{ label:'Throughput (veh/min)', data:[40,48,60,55,62,70], borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.15)', fill:true, tension:0.25 }] }, options:{ responsive:true, scales:{ y:{ beginAtZero:true }}}});
+      new Chart(document.getElementById('activityChart'), { type:'bar', data:{ labels:['Vision','Control','Routing','Comms'], datasets:[{ label:'Tasks', data:[12,10,9,8], backgroundColor:['#ef4444','#991b1b','#fca5a5','#fecaca'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false }}, scales:{ y:{ beginAtZero:true }}}});
+
+      const netCanvas = document.getElementById('netCanvas'); const ctx = netCanvas.getContext('2d');
+      const nodes=[{id:'I1',x:120,y:100,q:3},{id:'I2',x:300,y:80,q:4},{id:'I3',x:480,y:140,q:2}];
+      const edges=[[0,1],[1,2]]; let incidents=0; const bb=document.getElementById('bbStream');
+      function drawNet(){ ctx.clearRect(0,0,netCanvas.width,netCanvas.height); ctx.lineWidth=4; ctx.strokeStyle='#94a3b8'; edges.forEach(([a,b])=>{ const A=nodes[a],B=nodes[b]; ctx.beginPath(); ctx.moveTo(A.x,A.y); ctx.lineTo(B.x,B.y); ctx.stroke(); }); nodes.forEach(n=>{ const load=n.q; ctx.fillStyle = load>6?'#ef4444':(load>3?'#f59e0b':'#10b981'); ctx.beginPath(); ctx.arc(n.x,n.y,14,0,Math.PI*2); ctx.fill(); ctx.fillStyle='#fff'; ctx.font='12px Segoe UI'; ctx.fillText(n.id,n.x-8,n.y+4); }); }
+      function averageDelay(){ const d = nodes.reduce((s,n)=>s+n.q,0)/nodes.length; const text=`⏱️ delay: ${d.toFixed(1)}s`; document.getElementById('avgDelay').textContent = text; const sd=document.getElementById('statusDelay'); if(sd) sd.textContent = text; }
+      function tick(){ nodes.forEach(n=>{ n.q = Math.max(0, n.q + (Math.random()<0.5? -1: 1)); }); if(Math.random()<0.2){ nodes[Math.floor(Math.random()*nodes.length)].q += 2; } drawNet(); averageDelay(); }
+      function incident(){ incidents++; const text=`🚨 incidents: ${incidents}`; document.getElementById('incCount').textContent=text; const si=document.getElementById('statusInc'); if(si) si.textContent=text; const i=nodes[Math.floor(Math.random()*nodes.length)]; i.q+=3; bb.textContent = `[incident] at ${i.id} · queue=${i.q}\n` + (bb.textContent||''); }
+      function reroute(){ const maxI = nodes.reduce((m,n)=> n.q>m.q?n:m, nodes[0]); const minI = nodes.reduce((m,n)=> n.q<m.q?n:m, nodes[0]); if(maxI!==minI){ maxI.q=Math.max(0,maxI.q-2); minI.q+=1; bb.textContent = `[reroute] ${maxI.id} -> ${minI.id}\n` + bb.textContent; } drawNet(); averageDelay(); }
+      document.getElementById('tickBtn').addEventListener('click', tick);
+      document.getElementById('incidentBtn').addEventListener('click', incident);
+      document.getElementById('rerouteBtn').addEventListener('click', reroute);
+      drawNet(); averageDelay();
+
+      // Motion demo with samples
+      const motionChart = new Chart(document.getElementById('motionChart'), { type:'line', data:{ labels:[], datasets:[{ label:'Motion', data:[], borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.15)', fill:true, tension:0.25 }] }, options:{ responsive:true, scales:{ y:{ beginAtZero:true }}}});
+      const video=document.getElementById('video'), hiddenCanvas=document.getElementById('hiddenCanvas');
+      const fileInput=document.getElementById('videoFile'); const urlInput=document.getElementById('videoUrl');
+      const loadUrlBtn=document.getElementById('loadUrlBtn'); const clearBtn=document.getElementById('clearBtn');
+      const samples=[
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
+      ];
+      function setAndLoad(url){ urlInput.value=url; video.crossOrigin='anonymous'; video.src=url; video.play(); }
+      document.getElementById('sample1').addEventListener('click', ()=>setAndLoad(samples[0]));
+      document.getElementById('sample2').addEventListener('click', ()=>setAndLoad(samples[1]));
+      document.getElementById('sample3').addEventListener('click', ()=>setAndLoad(samples[2]));
+      document.getElementById('loadUrlBtn').addEventListener('click', ()=>{ const url=urlInput.value.trim(); if(!url) return; setAndLoad(url); });
+      fileInput.addEventListener('change', ()=>{ const f=fileInput.files&&fileInput.files[0]; if(!f) return; video.src=URL.createObjectURL(f); video.play(); });
+      clearBtn.addEventListener('click', ()=>{ video.pause(); video.removeAttribute('src'); video.load(); motionChart.data.labels=[]; motionChart.data.datasets[0].data=[]; motionChart.update(); });
+      function analyze(){ if(video.paused||video.ended) return; const c=hiddenCanvas.getContext('2d'); hiddenCanvas.width=160; hiddenCanvas.height=90; c.drawImage(video,0,0,160,90); const frame=c.getImageData(0,0,160,90).data; let m=0; if(window._pf){ for(let i=0;i<frame.length;i+=4){ m+=Math.abs(frame[i]-window._pf[i])+Math.abs(frame[i+1]-window._pf[i+1])+Math.abs(frame[i+2]-window._pf[i+2]); } const t=Math.round(video.currentTime*10)/10; motionChart.data.labels.push(`${t}s`); motionChart.data.datasets[0].data.push(Number((m/(160*90)).toFixed(2))); if(motionChart.data.labels.length>200){ motionChart.data.labels.shift(); motionChart.data.datasets[0].data.shift(); } motionChart.update('none'); } window._pf=new Uint8ClampedArray(frame); requestAnimationFrame(analyze); }
+      video.addEventListener('play', ()=>{ window._pf=null; motionChart.data.labels=[]; motionChart.data.datasets[0].data=[]; motionChart.update(); requestAnimationFrame(analyze); });
+    });
+  </script>
+</body>
+</html>

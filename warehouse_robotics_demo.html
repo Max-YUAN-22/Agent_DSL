@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Warehouse Robotics - Multi-Agent DSL Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="realtime-enhancements.js" defer></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif; margin:0; background:#f7f9fc; color:#222; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .header { text-align:center; margin-bottom: 16px; }
+    h1 { margin: 8px 0; }
+    .desc { color:#555; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-top: 20px; }
+    .grid3 { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
+    .card, .spec-card { background:#fff; border-radius:12px; padding:16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+    .title { font-weight:600; margin-bottom:10px; color:#22c55e; }
+    .back { display:inline-block; margin-top:12px; text-decoration:none; color:#22c55e; font-weight:600; }
+    .list { margin:0; padding-left:18px; color:#444; }
+    canvas { max-width:100%; }
+    .code { background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    .input-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .btn { padding:8px 12px; border:none; border-radius:6px; background:#22c55e; color:#fff; cursor:pointer; font-weight:600; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:14px; background:#dcfce7; color:#166534; font-weight:700; }
+    .emoji { font-size:1.05em; }
+    .status-strip { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:8px; }
+    .toplink { text-align:left; margin-bottom:10px; }
+    .toplink a { color:#22c55e; text-decoration:none; font-weight:700; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="toplink"><a href="/DSL-Multiagent/index.html">← Back to Home</a></div>
+      <h1>Warehouse Robotics</h1>
+      <div class="desc">Task allocation, path planning, and collision avoidance for mobile robots.</div>
+      <div class="status-strip"><span class="badge" id="statusTasks">📋 tasks: 0</span><span class="badge" id="statusCollisions">🛡️ collisions: 0</span></div>
+    </div>
+
+    <div class="card">
+      <div class="title">🎯 Goals · Roles · I/O</div>
+      <div class="grid3">
+        <div class="spec-card">
+          <h4>Goals</h4>
+          <ul class="list">
+            <li>📋 Balanced task assignment</li>
+            <li>🛣️ Collision-free path planning</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Roles & Agents</h4>
+          <ul class="list">
+            <li>🤖 Robots: route avoid obstacles; spawn new</li>
+            <li>🧑‍💼 Dispatcher: task allocation; monitor</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Inputs / Outputs / Ops</h4>
+          <ul class="list">
+            <li>Inputs: 📦 item locs · 🛠️ robot status</li>
+            <li>Outputs: 📋 tasks · 🛣️ paths</li>
+            <li>Ops: spawn → route · avoidance</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div id="interactive" class="grid">
+      <div class="card">
+        <div class="title">Throughput Timeline</div>
+        <canvas id="timelineChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">Agent Activity</div>
+        <canvas id="activityChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">DSL Showcase</div>
+        <div class="code"><pre>// ATSLP: Allocate pick/put tasks
+schedule_tasks([
+  assign(robot=R1, task=pick(P123)),
+  assign(robot=R2, task=put(Rack7)),
+  balance_load()
+])
+
+// HCMPL: Cache warehouse map tiles
+cache_store(key="map@tile_34", data=scan_tile(34))
+map_t34 = cache_get(key="map@tile_34")
+
+// CALK: Share safety zones
+broadcast({ zone: "no_go", area: DockA })</pre></div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">Path Planner & Avoidance</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <button class="btn" id="spawnRobot">Spawn Robot</button>
+          <button class="btn" id="assignTask">Assign Task</button>
+          <button class="btn" id="stepSim">Step</button>
+          <span class="badge" id="taskStat">📋 tasks: 0</span>
+          <span class="badge" id="collisionStat">🛡️ collisions: 0</span>
+        </div>
+        <canvas id="whCanvas" width="600" height="320" style="background:#f1f5f9;border-radius:8px;"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">Allocator Log</div>
+        <pre class="code" id="allocLog">(empty)</pre>
+      </div>
+
+      <div class="card">
+        <div class="title">Video Analysis (Beta)</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <input type="file" id="videoFile" accept="video/*" />
+          <input type="text" id="videoUrl" placeholder="Paste video URL (MP4/MOV/WebM)" />
+          <button class="btn" id="loadUrlBtn">Load</button>
+          <button class="btn" id="sample1">Sample 1</button>
+          <button class="btn" id="sample2">Sample 2</button>
+          <button class="btn" id="sample3">Sample 3</button>
+          <button class="btn" id="clearBtn" style="background:#64748b;">Clear</button>
+        </div>
+        <video id="video" controls></video>
+        <canvas id="hiddenCanvas" style="display:none;"></canvas>
+        <div style="margin-top:10px;">
+          <canvas id="motionChart" height="120"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Performance Snapshot</div>
+        <ul class="list">
+          <li>Throughput: 3.1 tasks/s</li>
+          <li>Avg Latency: 0.74s</li>
+          <li>Success Rate: 100%</li>
+        </ul>
+        <a class="back" href="/DSL-Multiagent/index.html">← Back to Home</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      new Chart(document.getElementById('timelineChart'), { type:'line', data:{ labels:['t0','t1','t2','t3','t4'], datasets:[{ label:'Picks completed', data:[0,5,12,18,25], borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.15)', fill:true, tension:0.25 }] }, options:{ responsive:true, scales:{ y:{ beginAtZero:true }}}});
+      new Chart(document.getElementById('activityChart'), { type:'bar', data:{ labels:['Vision','Planner','Routing','Safety'], datasets:[{ label:'Tasks', data:[9,12,10,6], backgroundColor:['#22c55e','#14532d','#86efac','#bbf7d0'] }] }, options:{ responsive:true, plugins:{ legend:{ display:false }}, scales:{ y:{ beginAtZero:true }}}});
+
+      // Warehouse grid simulation
+      const whCanvas=document.getElementById('whCanvas'); const ctx=whCanvas.getContext('2d');
+      const W=30,H=16; const cell=whCanvas.width/W; let robots=[], tasks=[]; let collisions=0;
+      function draw(){ ctx.clearRect(0,0,whCanvas.width,whCanvas.height); // shelves
+        ctx.fillStyle='#e5e7eb'; for(let x=4;x<W;x+=6){ ctx.fillRect(x*cell, 2*cell, 2*cell, 12*cell); }
+        // robots
+        robots.forEach(r=>{ ctx.fillStyle='#22c55e'; ctx.fillRect(r.x*cell+2, r.y*cell+2, cell-4, cell-4); });
+        // tasks
+        ctx.fillStyle='#f59e0b'; tasks.forEach(t=>{ ctx.beginPath(); ctx.arc(t.x*cell+cell/2, t.y*cell+cell/2, 6, 0, Math.PI*2); ctx.fill(); });
+      }
+      function free(x,y){ return !robots.some(r=>r.x===x&&r.y===y) && !((x%6>=4 && x%6<=5) && (y>=2 && y<=13)); }
+      function step(){ robots.forEach(r=>{ if(!r.path||!r.path.length){ if(tasks.length){ const t=tasks.shift(); r.path = plan(r.x,r.y,t.x,t.y); log(`assign ${r.id} -> (${t.x},${t.y})`); updateStats(); } return; } const [nx,ny]=r.path.shift(); if(robots.some(o=>o!==r&&o.x===nx&&o.y===ny)){ collisions++; document.getElementById('collisionStat').textContent=`🛡️ collisions: ${collisions}`; return; } r.x=nx; r.y=ny; }); draw(); }
+      function plan(sx,sy,dx,dy){ const q=[[sx,sy]]; const pre={}; const key=(x,y)=>`${x},${y}`; pre[key(sx,sy)]=null; while(q.length){ const [x,y]=q.shift(); if(x===dx&&y===dy) break; [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx1,dy1])=>{ const nx=x+dx1,ny=y+dy1; if(nx>=0&&nx<W&&ny>=0&&ny<H&&free(nx,ny)&&!(key(nx,ny) in pre)){ pre[key(nx,ny)]=[x,y]; q.push([nx,ny]); } }); } const path=[]; let cur=[dx,dy]; while(cur){ path.unshift(cur); cur=pre[key(cur[0],cur[1])]; } return path; }
+      function spawn(){ const id=`R${robots.length+1}`; let x=1,y=1; while(!free(x,y)){ x=Math.floor(Math.random()*W); y=Math.floor(Math.random()*H); } robots.push({id,x,y,path:[]}); log(`spawn ${id} @(${x},${y})`); }
+      function assign(){ let x=Math.floor(Math.random()*W), y=Math.floor(Math.random()*H); while(!free(x,y)){ x=Math.floor(Math.random()*W); y=Math.floor(Math.random()*H); } tasks.push({x,y}); updateStats(); }
+      function log(s){ const el=document.getElementById('allocLog'); el.textContent = `[${new Date().toLocaleTimeString()}] ${s}\n` + el.textContent; }
+      function updateStats(){ const tText=`📋 tasks: ${tasks.length}`; document.getElementById('taskStat').textContent = tText; const st=document.getElementById('statusTasks'); if(st) st.textContent=tText; const sc=document.getElementById('statusCollisions'); if(sc) sc.textContent=`🛡️ collisions: ${collisions}`; }
+      document.getElementById('spawnRobot').addEventListener('click', spawn);
+      document.getElementById('assignTask').addEventListener('click', assign);
+      document.getElementById('stepSim').addEventListener('click', step);
+      draw(); updateStats();
+
+      // Video Analysis (added)
+      const motionChart = new Chart(document.getElementById('motionChart'), { type:'line', data:{ labels:[], datasets:[{ label:'Motion', data:[], borderColor:'#22c55e', backgroundColor:'rgba(34,197,94,0.15)', fill:true, tension:0.25 }] }, options:{ responsive:true, scales:{ y:{ beginAtZero:true }}}});
+      const video=document.getElementById('video'), hiddenCanvas=document.getElementById('hiddenCanvas');
+      const fileInput=document.getElementById('videoFile'); const urlInput=document.getElementById('videoUrl');
+      const loadUrlBtn=document.getElementById('loadUrlBtn'); const clearBtn=document.getElementById('clearBtn');
+      const samples=[
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4'
+      ];
+      function setAndLoad(url){ urlInput.value=url; video.crossOrigin='anonymous'; video.src=url; video.play(); }
+      document.getElementById('sample1').addEventListener('click', ()=>setAndLoad(samples[0]));
+      document.getElementById('sample2').addEventListener('click', ()=>setAndLoad(samples[1]));
+      document.getElementById('sample3').addEventListener('click', ()=>setAndLoad(samples[2]));
+      loadUrlBtn.addEventListener('click', ()=>{ const url=urlInput.value.trim(); if(!url) return; setAndLoad(url); });
+      fileInput.addEventListener('change', ()=>{ const f=fileInput.files&&fileInput.files[0]; if(!f) return; video.src=URL.createObjectURL(f); video.play(); });
+      clearBtn.addEventListener('click', ()=>{ video.pause(); video.removeAttribute('src'); video.load(); motionChart.data.labels=[]; motionChart.data.datasets[0].data=[]; motionChart.update(); });
+      function analyze(){ if(video.paused||video.ended) return; const c=hiddenCanvas.getContext('2d'); hiddenCanvas.width=160; hiddenCanvas.height=90; c.drawImage(video,0,0,160,90); const frame=c.getImageData(0,0,160,90).data; let m=0; if(window._pf){ for(let i=0;i<frame.length;i+=4){ m+=Math.abs(frame[i]-window._pf[i])+Math.abs(frame[i+1]-window._pf[i+1])+Math.abs(frame[i+2]-window._pf[i+2]); } const t=Math.round(video.currentTime*10)/10; motionChart.data.labels.push(`${t}s`); motionChart.data.datasets[0].data.push(Number((m/(160*90)).toFixed(2))); if(motionChart.data.labels.length>200){ motionChart.data.labels.shift(); motionChart.data.datasets[0].data.shift(); } motionChart.update('none'); } window._pf=new Uint8ClampedArray(frame); requestAnimationFrame(analyze); }
+      video.addEventListener('play', ()=>{ window._pf=null; motionChart.data.labels=[]; motionChart.data.datasets[0].data=[]; motionChart.update(); requestAnimationFrame(analyze); });
+    });
+  </script>
+</body>
+</html>

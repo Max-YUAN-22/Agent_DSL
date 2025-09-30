@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Grid Outage - Multi-Agent DSL Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="realtime-enhancements.js" defer></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif; margin:0; background:#f7f9fc; color:#222; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .header { text-align:center; margin-bottom: 16px; }
+    h1 { margin: 8px 0; }
+    .desc { color:#555; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-top: 20px; }
+    .grid3 { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
+    .card, .spec-card { background:#fff; border-radius:12px; padding:16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+    .title { font-weight:600; margin-bottom:10px; color:#0d9488; }
+    .back { display:inline-block; margin-top:12px; text-decoration:none; color:#0d9488; font-weight:600; }
+    .list { margin:0; padding-left:18px; color:#444; }
+    .code { background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    canvas { max-width:100%; }
+    .input-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .btn { padding:8px 12px; border:none; border-radius:6px; background:#0d9488; color:#fff; cursor:pointer; font-weight:600; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:14px; background:#ecfeff; color:#0e7490; font-weight:700; }
+    pre.raw { background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; max-height:260px; overflow:auto; }
+    .metric { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:8px; }
+    .status-strip { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:8px; }
+    .emoji { font-size:1.05em; }
+    @keyframes bump { 0%{ transform:scale(1); } 50%{ transform:scale(1.06); } 100%{ transform:scale(1); } }
+    .bump { animation: bump .35s ease; }
+    .toplink { text-align:left; margin-bottom:10px; }
+    .toplink a { color:#0d9488; text-decoration:none; font-weight:700; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes fault-spread { 0% { background: #10b981; } 50% { background: #f59e0b; } 100% { background: #ef4444; } }
+    @keyframes repair { 0% { background: #ef4444; } 50% { background: #f59e0b; } 100% { background: #10b981; } }
+    .pulse { animation: pulse 2s infinite; }
+    .fault-spread { animation: fault-spread 1s infinite; }
+    .repair { animation: repair 2s infinite; }
+    .realtime-controls { background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 8px 0; }
+    .auto-play { background: #10b981; }
+    .auto-play:hover { background: #059669; }
+    .status-live { background: #ef4444; color: white; }
+    .status-live::after { content: " ●"; animation: pulse 1s infinite; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="toplink"><a href="/DSL-Multiagent/index.html">← Back to Home</a></div>
+      <h1>Smart Grid Outage</h1>
+      <div class="desc">Multi-agent restoration planning, fault isolation, and load redistribution.</div>
+      <div class="status-strip"><span class="badge" id="statusFaults">⚠️ faults: 0</span><span class="badge" id="statusRest">📈 restoration: 100%</span></div>
+    </div>
+
+    <div class="card">
+      <div class="title">🎯 Goals · Roles · I/O</div>
+      <div class="grid3">
+        <div class="spec-card">
+          <h4>Goals</h4>
+          <ul class="list">
+            <li>📈 Restoration rate (restored load %)</li>
+            <li>⚠️ Fault propagation control</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Roles & Agents</h4>
+          <ul class="list">
+            <li>🧑‍💼 Dispatcher: spawn repair tasks</li>
+            <li>🤖 Repair robots: route to faults</li>
+            <li>⚡ Equipment nodes: reflect topology & faults</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Inputs / Outputs / Ops</h4>
+          <ul class="list">
+            <li>Inputs: ⚡ alarms · 🗺️ topology · 🔧 repair needs</li>
+            <li>Outputs: 🛠️ progress · 📈 restoration</li>
+            <li>Ops: spawn → route → reconfigure → verify</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">Restoration Progress</div>
+        <canvas id="restoreChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">Agent Workload</div>
+        <canvas id="workChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">DSL Showcase</div>
+        <div class="code"><pre>// ATSLP: Prioritize repair, switching, and verification tasks
+schedule_tasks([
+  isolate_fault(feeder=F12),
+  reconfigure_switches(path=P1),
+  verify_voltage(nodes=ClusterA)
+])
+
+// HCMPL: Cache stable grid snapshots
+cache_store(key="grid_state@t", data=current_state())
+state = cache_get(key="grid_state@t")
+
+// CALK: Share safety constraints and policies
+broadcast({ policy: "manual_override_block", region: R1 })</pre></div>
+      </div>
+    </div>
+
+    <div id="interactive" class="grid">
+      <div class="card">
+        <div class="title">Grid Topology & Fault Propagation</div>
+        <div class="realtime-controls" style="background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 8px 0;">
+          <div class="input-row" style="margin-bottom:8px;">
+            <button class="btn" id="injectFault">Inject Fault</button>
+            <button class="btn" id="propagateBtn">Propagate</button>
+            <button class="btn" id="restoreBtn">Restore</button>
+            <button class="btn auto-play" id="autoPlayBtn" style="background:#10b981;">▶️ Auto Play</button>
+            <button class="btn" id="resetBtn" style="background:#64748b;">Reset</button>
+          </div>
+          <div class="input-row">
+            <span id="gridStatus" class="badge">status: normal</span>
+            <span class="badge" id="timeElapsed">Time: 00:00</span>
+            <span class="badge" id="simSpeed">Speed: 1x</span>
+          </div>
+        </div>
+        <canvas id="topologyCanvas" width="520" height="280" style="background:#f1f5f9;border-radius:8px;"></canvas>
+        <div class="metric">
+          <span class="badge" id="faultCount">⚠️ faults: 0</span>
+          <span class="badge" id="restoration">📈 restoration: 100%</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">ATSLP Scheduler UI</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <button class="btn" id="assignBtn">Assign Next Task</button>
+          <button class="btn" id="rebalanceBtn">Rebalance</button>
+        </div>
+        <ul class="list" id="schedList"><li>Use controls to schedule isolation/reconfigure/verify tasks based on load.</li></ul>
+      </div>
+
+      <div class="card">
+        <div class="title">Raw Data (run.json)</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <input type="file" id="runFile" accept="application/json" />
+          <button class="btn" id="loadSample">Load Sample</button>
+          <button class="btn" id="toggleRaw">Toggle JSON</button>
+        </div>
+        <pre id="rawJson" class="raw" style="display:none;"></pre>
+      </div>
+
+      <div class="card">
+        <div class="title">Video Analysis (Beta)</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <input type="file" id="videoFile" accept="video/*" />
+          <input type="text" id="videoUrl" placeholder="Paste video URL (MP4/MOV/WebM)" />
+          <button class="btn" id="loadUrlBtn">Load</button>
+          <button class="btn" id="sample1">Sample 1</button>
+          <button class="btn" id="sample2">Sample 2</button>
+          <button class="btn" id="sample3">Sample 3</button>
+          <button class="btn" id="clearBtn" style="background:#64748b;">Clear</button>
+        </div>
+        <div id="videoError" class="badge" style="display:none;background:#fee2e2;color:#991b1b;">Video load failed (CORS/format)</div>
+        <video id="video" controls></video>
+        <canvas id="hiddenCanvas" style="display:none;"></canvas>
+        <div style="margin-top:10px;">
+          <canvas id="motionChart" height="120"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Performance Snapshot</div>
+        <ul class="list">
+          <li>Throughput: 2.6 tasks/s</li>
+          <li>Avg Latency: 0.81s</li>
+          <li>Success Rate: 100%</li>
+        </ul>
+        <a class="back" href="/DSL-Multiagent/index.html">← Back to Home</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // Charts
+      const restoreChart = new Chart(document.getElementById('restoreChart'), { type:'line', data:{ labels:['t0','t1','t2','t3','t4','t5'], datasets:[{ label:'Restored feeders (%)', data:[0,15,38,62,84,100], borderColor:'#0d9488', backgroundColor:'rgba(13,148,136,0.15)', fill:true, tension:0.25 }] }, options:{ responsive:true, plugins:{legend:{display:true}}, scales:{ y:{ beginAtZero:true, max:100 }}}});
+      new Chart(document.getElementById('workChart'), { type:'bar', data:{ labels:['Detection','Planning','Execution','Comms','Safety'], datasets:[{ label:'Tasks handled', data:[10,12,14,7,9], backgroundColor:['#0d9488','#134e4a','#34d399','#99f6e4','#2dd4bf'] }] }, options:{ responsive:true, plugins:{legend:{display:false}}, scales:{ y:{ beginAtZero:true }}}});
+
+      // Topology
+      const topo = { nodes:[{id:'S',x:60,y:140},{id:'A',x:180,y:80},{id:'B',x:180,y:200},{id:'C',x:320,y:60},{id:'D',x:320,y:140},{id:'E',x:320,y:220},{id:'F',x:460,y:140}], edges:[['S','A'],['S','B'],['A','C'],['A','D'],['B','D'],['B','E'],['D','F'],['E','F']] };
+      const faults = new Set(); const topoCanvas = document.getElementById('topologyCanvas'); const tctx = topoCanvas.getContext('2d');
+      const faultCount = document.getElementById('faultCount');
+      const restoration = document.getElementById('restoration');
+      function recomputeMetrics(){ const total=topo.nodes.length; const f=faults.size; const rest=Math.max(0, Math.round((1 - f/total)*100)); const fText=`⚠️ faults: ${f}`, rText=`📈 restoration: ${rest}%`; faultCount.textContent=fText; faultCount.classList.add('bump'); setTimeout(()=>faultCount.classList.remove('bump'),350); restoration.textContent=rText; restoration.classList.add('bump'); setTimeout(()=>restoration.classList.remove('bump'),350); const sf=document.getElementById('statusFaults'); if(sf){ sf.textContent=fText; sf.classList.add('bump'); setTimeout(()=>sf.classList.remove('bump'),350);} const sr=document.getElementById('statusRest'); if(sr){ sr.textContent=rText; sr.classList.add('bump'); setTimeout(()=>sr.classList.remove('bump'),350);} restoreChart.data.datasets[0].data.push(rest); restoreChart.data.labels.push(`t${restoreChart.data.labels.length}`); if(restoreChart.data.labels.length>12){ restoreChart.data.datasets[0].data.shift(); restoreChart.data.labels.shift(); } restoreChart.update('none'); }
+      function drawTopo(){ tctx.clearRect(0,0,topoCanvas.width,topoCanvas.height); // edges
+        tctx.lineWidth=3; topo.edges.forEach(([u,v])=>{ const a=topo.nodes.find(n=>n.id===u), b=topo.nodes.find(n=>n.id===v); tctx.strokeStyle = (faults.has(u)||faults.has(v))?'#ef4444':'#94a3b8'; tctx.beginPath(); tctx.moveTo(a.x,a.y); tctx.lineTo(b.x,b.y); tctx.stroke(); }); // nodes
+        topo.nodes.forEach(n=>{ tctx.fillStyle = faults.has(n.id)?'#ef4444':'#0d9488'; tctx.beginPath(); tctx.arc(n.x,n.y,12,0,Math.PI*2); tctx.fill(); tctx.fillStyle='#fff'; tctx.font='12px Segoe UI'; tctx.fillText(n.id,n.x-6,n.y+4); }); }
+      function injectFault(){ faults.add('D'); document.getElementById('gridStatus').textContent='status: fault@D'; drawTopo(); recomputeMetrics(); }
+      function propagate(){ if(faults.has('D')){ faults.add('A'); faults.add('B'); document.getElementById('gridStatus').textContent='status: propagation to A,B'; drawTopo(); recomputeMetrics(); } }
+      function restore(){ faults.clear(); document.getElementById('gridStatus').textContent='status: normal'; drawTopo(); recomputeMetrics(); }
+      document.getElementById('injectFault').addEventListener('click', injectFault);
+      document.getElementById('propagateBtn').addEventListener('click', propagate);
+      document.getElementById('restoreBtn').addEventListener('click', restore);
+      drawTopo(); recomputeMetrics();
+
+      // ATSLP scheduler mock
+      const agents=[{id:'Tech-1',load:0.2},{id:'Tech-2',load:0.4},{id:'Tech-3',load:0.1}];
+      const tasks=[{name:'isolate_fault F12',cap:'isolation'},{name:'reconfigure P1',cap:'switch'},{name:'verify_voltage ClusterA',cap:'verify'}];
+      const schedList=document.getElementById('schedList');
+      function renderSched(){ schedList.innerHTML = agents.map(a=>`<li>${a.id} · load=${(a.load*100|0)}%</li>`).join('') + `<li><em>Queue:</em> ${tasks.map(t=>t.name).join(' | ')}</li>`; }
+      function assignNext(){ if(!tasks.length) return; const next=tasks.shift(); const best=agents.slice().sort((a,b)=>a.load-b.load)[0]; best.load=Math.min(1,best.load+0.25); schedList.innerHTML = `<li>Assigned: ${next.name} → ${best.id}</li>` + schedList.innerHTML; renderSched(); }
+      function rebalance(){ const avg = agents.reduce((s,a)=>s+a.load,0)/agents.length; agents.forEach(a=>{ a.load = (a.load*0.7 + avg*0.3); }); renderSched(); }
+      document.getElementById('assignBtn').addEventListener('click', assignNext);
+      document.getElementById('rebalanceBtn').addEventListener('click', rebalance);
+      renderSched();
+
+      // Raw data
+      const runFile=document.getElementById('runFile'); const rawEl=document.getElementById('rawJson'); const loadSample=document.getElementById('loadSample'); const toggleRaw=document.getElementById('toggleRaw');
+      loadSample.addEventListener('click', ()=>{ rawEl.textContent = JSON.stringify({topology:topo, faults:[...faults], agents, tasks}, null, 2); });
+      toggleRaw.addEventListener('click', ()=>{ rawEl.style.display = (rawEl.style.display==='none')?'block':'none'; });
+      runFile.addEventListener('change', ()=>{ const f=runFile.files&&runFile.files[0]; if(!f) return; const reader=new FileReader(); reader.onload=()=>{ try{ rawEl.textContent = reader.result; rawEl.style.display='block'; }catch(e){ alert('Invalid JSON'); } }; reader.readAsText(f); });
+
+      // Video Analysis (added)
+      const motionCtx = document.getElementById('motionChart');
+      const motionChart = new Chart(motionCtx, { type:'line', data:{ labels:[], datasets:[{ label:'Motion', data:[], borderColor:'#0d9488', backgroundColor:'rgba(13,148,136,0.15)', fill:true, tension:0.25 }] }, options:{ responsive:true, plugins:{ legend:{ display:true }}, scales:{ y:{ beginAtZero:true }}}});
+      const video = document.getElementById('video');
+      const hiddenCanvas = document.getElementById('hiddenCanvas');
+      const fileInput = document.getElementById('videoFile');
+      const urlInput = document.getElementById('videoUrl');
+      const loadUrlBtn = document.getElementById('loadUrlBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const errEl = document.getElementById('videoError');
+      const samples = [
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
+      ];
+      function setAndLoad(url){ urlInput.value=url; video.crossOrigin='anonymous'; video.src=url; video.play(); }
+      document.getElementById('sample1').addEventListener('click', ()=>setAndLoad(samples[0]));
+      document.getElementById('sample2').addEventListener('click', ()=>setAndLoad(samples[1]));
+      document.getElementById('sample3').addEventListener('click', ()=>setAndLoad(samples[2]));
+      fileInput.addEventListener('change', () => { const f=fileInput.files&&fileInput.files[0]; if(!f) return; video.src = URL.createObjectURL(f); video.play(); });
+      loadUrlBtn.addEventListener('click', ()=>{ const url=urlInput.value.trim(); if(!url) return; setAndLoad(url); });
+      clearBtn.addEventListener('click', ()=>{ video.pause(); video.removeAttribute('src'); video.load(); motionChart.data.labels=[]; motionChart.data.datasets[0].data=[]; motionChart.update(); });
+      video.addEventListener('error', ()=>{ errEl.style.display='inline-block'; });
+      video.addEventListener('loadeddata', ()=>{ errEl.style.display='none'; });
+      function analyze(){ if(video.paused||video.ended) return; const c=hiddenCanvas.getContext('2d'); hiddenCanvas.width=160; hiddenCanvas.height=90; c.drawImage(video,0,0,160,90); const frame=c.getImageData(0,0,160,90).data; let m=0; if(window._pf){ for(let i=0;i<frame.length;i+=4){ m+=Math.abs(frame[i]-window._pf[i])+Math.abs(frame[i+1]-window._pf[i+1])+Math.abs(frame[i+2]-window._pf[i+2]); } const t=Math.round(video.currentTime*10)/10; motionChart.data.labels.push(`${t}s`); motionChart.data.datasets[0].data.push(Number((m/(160*90)).toFixed(2))); if(motionChart.data.labels.length>200){ motionChart.data.labels.shift(); motionChart.data.datasets[0].data.shift(); } motionChart.update('none'); } window._pf=new Uint8ClampedArray(frame); requestAnimationFrame(analyze); }
+      video.addEventListener('play', ()=>{ window._pf=null; motionChart.data.labels=[]; motionChart.data.datasets[0].data=[]; motionChart.update(); requestAnimationFrame(analyze); });
+    });
+  </script>
+</body>
+</html>
+
+

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DSL Primitives Demo - Multi-Agent Framework</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 0; padding: 20px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); min-height: 100vh; }
+        .container { max-width: 1400px; margin: 0 auto; background: rgba(255, 255, 255, 0.95); padding: 30px; border-radius: 15px; box-shadow: 0 8px 32px rgba(0,0,0,0.1); backdrop-filter: blur(10px); }
+        .header { text-align: center; margin-bottom: 30px; padding: 20px; background: linear-gradient(135deg, #3498db, #2980b9); color: white; border-radius: 10px; }
+        .header h1 { margin: 0; font-size: 2.4em; font-weight: 700; }
+        .header p { margin: 10px 0 0 0; font-size: 1.05em; opacity: 0.9; }
+        .primitive-section { background: white; padding: 22px; border-radius: 15px; margin: 18px 0; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-left: 5px solid #3498db; }
+        .primitive-title { font-size: 1.6em; font-weight: bold; color: #2c3e50; margin-bottom: 12px; display: flex; align-items: center; }
+        .primitive-icon { font-size: 1.1em; margin-right: 10px; }
+        .primitive-description { background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 12px 0; border-left: 4px solid #3498db; }
+        .code-example { background: #0b1020; color: #e2e8f0; padding: 16px; border-radius: 8px; margin: 12px 0; font-family: 'Courier New', monospace; font-size: 0.9em; overflow-x: auto; position: relative; }
+        .code-example::before { content: attr(data-language); position: absolute; top: 5px; right: 10px; background: #1f2937; color: #cbd5e1; padding: 2px 8px; border-radius: 4px; font-size: 0.8em; }
+        .two-col { display:grid; grid-template-columns: repeat(auto-fit,minmax(320px,1fr)); gap:16px; }
+        .execution-log { background:#0b1020; color:#e2e8f0; border-radius:10px; padding:12px; margin:18px 0; max-height: 340px; overflow-y:auto; font-family:'Courier New',monospace; font-size:.9em; }
+        .btn { background: linear-gradient(135deg, #3498db, #2980b9); color: white; border: none; padding: 10px 20px; border-radius: 25px; cursor: pointer; font-size: 14px; font-weight: 600; margin: 4px; transition: all 0.3s ease; }
+        .btn:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2); }
+        .demo-controls { background:#f8f9fa; padding:16px; border-radius:10px; text-align:center; margin:16px 0; }
+        .toplink { text-align:left; margin-bottom:10px; }
+        .toplink a { color:#fff; text-decoration:none; font-size:1.05em; background: rgba(255,255,255,0.2); padding:8px 14px; border-radius:20px; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="toplink">
+                <a href="index.html">← Back to Home</a>
+            </div>
+            <h1>🔧 DSL Primitives</h1>
+            <p>Paper-aligned core language constructs for agent orchestration with operational intent.</p>
+        </div>
+
+        <div class="primitive-section">
+            <div class="primitive-title"><span class="primitive-icon">📚</span>Grammar (EBNF/Sketch)</div>
+            <div class="code-example" data-language="EBNF">
+Program     := Stmt*;
+Stmt        := Spawn | Route | Gather | WithSLA | Contract | Blackboard | Event;
+Spawn       := "spawn" Identifier CapabilityList? Options?;
+Route       := "route" Task "to" AgentRef Options?;
+Gather      := "gather" "{" Route+ "}" Reducer?;
+WithSLA     := "with_sla" "{" Constraint+ "}" Stmt+ "end";
+Contract    := "contract" PartyList ObligationList;
+Blackboard  := "blackboard" ("put" | "get" | "del") Key Value?;
+Event       := ("on" EventName Block) | ("emit" EventName Payload?);
+            </div>
+        </div>
+
+        <div class="primitive-section">
+            <div class="primitive-title"><span class="primitive-icon">🧩</span>spawn</div>
+            <div class="primitive-description">Create an agent with declared capabilities and policies.</div>
+            <div class="two-col">
+                <div class="code-example" data-language="DSL">
+spawn vision_agent id=V1 caps=["detect","track"] policy={retry:2,timeout:2s}
+spawn master_agent id=M caps=["plan","allocate"]
+spawn action_agent id=A1 caps=["evacuate","medic"]
+                </div>
+                <div class="code-example" data-language="Semantics">
+Pre: id ∉ Agents
+Post: Agents' := Agents ∪ {⟨id,caps,policy⟩}
+                </div>
+            </div>
+        </div>
+
+        <div class="primitive-section">
+            <div class="primitive-title"><span class="primitive-icon">➡️</span>route</div>
+            <div class="primitive-description">Send a task to a target agent (capability-aware), honoring policy.</div>
+            <div class="two-col">
+                <div class="code-example" data-language="DSL">
+route task detect_hotspots(area=S2) to V1 {deadline:1.0s}
+route task plan_evac(zone=Z1) to M
+                </div>
+                <div class="code-example" data-language="Semantics">
+Effect: Queue[target] := Queue[target] ⧺ ⟨task,deadline,caller⟩
+Failure: if timeout→ emit timeout(task,target)
+                </div>
+            </div>
+        </div>
+
+        <div class="primitive-section">
+            <div class="primitive-title"><span class="primitive-icon">🔗</span>gather</div>
+            <div class="primitive-description">Fan-out multiple routes and reduce results.</div>
+            <div class="two-col">
+                <div class="code-example" data-language="DSL">
+gather {
+  route task scan(tile=1) to V1
+  route task scan(tile=2) to V1
+} reduce=concat
+                </div>
+                <div class="code-example" data-language="Semantics">
+Wait for all subtasks or SLA window; apply reducer R over results.
+                </div>
+            </div>
+        </div>
+
+        <div class="primitive-section">
+            <div class="primitive-title"><span class="primitive-icon">⏱️</span>with_sla</div>
+            <div class="primitive-description">Constrain blocks with deadlines, budgets, retries; violations emit events.</div>
+            <div class="two-col">
+                <div class="code-example" data-language="DSL">
+with_sla { deadline:2s, budget: $0.10, retry:1 } 
+  route task triage(patient=P1) to M
+end
+                </div>
+                <div class="code-example" data-language="Semantics">
+Decorator installs monitors; on breach → emit sla_violation(meta)
+                </div>
+            </div>
+        </div>
+
+        <div class="primitive-section">
+            <div class="primitive-title"><span class="primitive-icon">📜</span>contract</div>
+            <div class="primitive-description">Specify obligations between parties; runtime checks assertions.</div>
+            <div class="two-col">
+                <div class="code-example" data-language="DSL">
+contract parties [M, A1] {
+  obligation A1: ack within 500ms
+  obligation M : provide route within 1s
+}
+                </div>
+                <div class="code-example" data-language="Semantics">
+Adds guards to message handlers; violations raise contract_violation.
+                </div>
+            </div>
+        </div>
+
+        <div class="primitive-section">
+            <div class="primitive-title"><span class="primitive-icon">🗂️</span>blackboard</div>
+            <div class="primitive-description">Shared knowledge store for publish/lookup across agents.</div>
+            <div class="two-col">
+                <div class="code-example" data-language="DSL">
+blackboard put risk_map@t := compute_risk(S2)
+route task plan with map=blackboard get risk_map@t to M
+                </div>
+                <div class="code-example" data-language="Semantics">
+Map K→V; put overwrites; get yields ⟨val,ts⟩ or ⊥.
+                </div>
+            </div>
+        </div>
+
+        <div class="primitive-section">
+            <div class="primitive-title"><span class="primitive-icon">📡</span>on / emit</div>
+            <div class="primitive-description">Event-driven coordination: agents subscribe with on, others emit.</div>
+            <div class="two-col">
+                <div class="code-example" data-language="DSL">
+on timeout(t): route task retry(t) to M
+emit incident_detected { loc:S2, severity:HIGH }
+                </div>
+                <div class="code-example" data-language="Semantics">
+Append handler to dispatch table; emit enqueues event for subscribers.
+                </div>
+            </div>
+        </div>
+
+        <div class="demo-controls">
+            <button class="btn" onclick="loadExample('wildfire')">Load Wildfire Example</button>
+            <button class="btn" onclick="loadExample('grid')">Load Smart Grid Example</button>
+            <button class="btn" onclick="clearLog()">Clear</button>
+        </div>
+
+        <div class="execution-log" id="executionLog">
+[00:00] Primitives viewer ready. Choose an example to render an execution trace.
+        </div>
+    </div>
+
+    <script>
+        function addLog(msg){ const el=document.getElementById('executionLog'); el.textContent += `\n${msg}`; el.scrollTop = el.scrollHeight; }
+        function clearLog(){ document.getElementById('executionLog').textContent='[00:00] Cleared. Choose an example.'; }
+        function loadExample(kind){ clearLog();
+          if(kind==='wildfire'){
+            addLog('[00:01] spawn V1,M,A1');
+            addLog('[00:02] route detect_hotspots → V1');
+            addLog('[00:03] with_sla{deadline=2s} route plan_evac → M');
+            addLog('[00:04] blackboard put risk_map@t');
+            addLog('[00:05] gather{ route scan tiles } reduce=concat');
+            addLog('[00:06] emit incident_detected');
+          } else if(kind==='grid'){
+            addLog('[00:01] spawn detectors D1..D3, exec E1');
+            addLog('[00:02] route isolate_fault → D1');
+            addLog('[00:03] contract(M,E1){obligation ack<500ms}');
+            addLog('[00:04] with_sla{budget=$0.05} route reconfigure → E1');
+            addLog('[00:05] emit restore_segment S-12');
+          }
+        }
+    </script>
+</body>
+</html>

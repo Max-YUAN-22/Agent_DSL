@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Healthcare - Multi-Agent DSL Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="realtime-enhancements.js" defer></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif; margin:0; background:#f7f9fc; color:#222; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .header { text-align:center; margin-bottom: 16px; }
+    h1 { margin: 8px 0; }
+    .desc { color:#555; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-top: 20px; }
+    .grid3 { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
+    .card, .spec-card { background:#fff; border-radius:12px; padding:16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+    .title { font-weight:600; margin-bottom:10px; color:#a855f7; }
+    .back { display:inline-block; margin-top:12px; text-decoration:none; color:#a855f7; font-weight:600; }
+    .list { margin:0; padding-left:18px; color:#444; }
+    canvas { max-width:100%; }
+    .code { background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    .input-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .btn { padding:8px 12px; border:none; border-radius:6px; background:#a855f7; color:#fff; cursor:pointer; font-weight:600; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:14px; background:#f3e8ff; color:#6b21a8; font-weight:700; }
+    table { width:100%; border-collapse: collapse; }
+    th, td { padding:10px; border-bottom:1px solid #e5e7eb; text-align:left; }
+    .status-strip { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:8px; }
+    @keyframes bump { 0%{ transform:scale(1); } 50%{ transform:scale(1.06); } 100%{ transform:scale(1); } }
+    .bump { animation: bump .35s ease; }
+    .emoji { font-size:1.05em; }
+    .toplink { text-align:left; margin-bottom:10px; }
+    .toplink a { color:#a855f7; text-decoration:none; font-weight:700; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="toplink"><a href="/DSL-Multiagent/index.html">← Back to Home</a></div>
+      <h1>Smart Healthcare</h1>
+      <div class="desc">Emergency triage, patient routing, and resource allocation with multi-agent coordination.</div>
+      <div class="status-strip"><span class="badge" id="statusTriage">⏱️ triaged: 0/0</span><span class="badge" id="statusICU">🏥 ICU beds: 0 · occupied: 0</span></div>
+    </div>
+
+    <div class="card">
+      <div class="title">🎯 Goals · Roles · I/O</div>
+      <div class="grid3">
+        <div class="spec-card">
+          <h4>Goals</h4>
+          <ul class="list">
+            <li>⏱️ Triage efficiency (processed / total)</li>
+            <li>🏥 Resource allocation effectiveness</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Roles & Agents</h4>
+          <ul class="list">
+            <li>🩺 ED staff: spawn resources; route patients</li>
+            <li>🧑‍💼 Coordinator: blackboard share; prioritize</li>
+            <li>🧑‍🦰 Patients: severity HIGH/MED/LOW</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Inputs / Outputs / Ops</h4>
+          <ul class="list">
+            <li>Inputs: 📋 patient info · 🛠️ device status</li>
+            <li>Outputs: 💼 allocation · ⬆️ priority</li>
+            <li>Ops: spawn → route → blackboard (HCMPL)</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">Triage Timeline</div>
+        <canvas id="timelineChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">Agent Activity</div>
+        <canvas id="activityChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">DSL Showcase</div>
+        <div class="code"><pre>// ATSLP: Triage, route, and allocate resources
+schedule_tasks([
+  triage(patient=P1, severity=HIGH),
+  route(patient=P1, dest=CT),
+  allocate_resource(unit=ICU, bed=auto)
+])
+
+// HCMPL: Cache occupancy and wait-time snapshots
+cache_store(key="icu_occupancy@t", data=current_icu())
+occup = cache_get(key="icu_occupancy@t")
+
+// CALK: Share cross-department constraints
+broadcast({ constraint: "CT_overload", action: "reroute_to_hospital_B" })</pre></div>
+      </div>
+    </div>
+
+    <div id="interactive" class="grid">
+      <div class="card">
+        <div class="title">Triage Board</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <button class="btn" id="triageNext">Triage Next</button>
+          <button class="btn" id="routeToCT">Route → CT</button>
+          <span class="badge" id="triageStat">⏱️ triaged: 0/0</span>
+          <span class="badge" id="bbItems">📋 blackboard: 0</span>
+        </div>
+        <table>
+          <thead><tr><th>Patient</th><th>Severity</th><th>Status</th></tr></thead>
+          <tbody id="patientTable"></tbody>
+        </table>
+      </div>
+
+      <div class="card">
+        <div class="title">Resource Allocator (ICU/CT)</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <button class="btn" id="spawnBed">Spawn ICU Bed</button>
+          <button class="btn" id="assignBed">Assign ICU</button>
+          <button class="btn" id="cacheSnapshot">HCMPL Cache Snapshot</button>
+        </div>
+        <ul class="list" id="allocList"><li>Use controls to manage beds & allocations.</li></ul>
+        <div class="badge" id="icuStat">🏥 ICU beds: 0 · occupied: 0</div>
+      </div>
+
+      <div class="card">
+        <div class="title">Video Analysis (Beta)</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <input type="file" id="videoFile" accept="video/*" />
+          <input type="text" id="videoUrl" placeholder="Paste video URL (MP4/MOV/WebM)" />
+          <button class="btn" id="loadUrlBtn">Load</button>
+          <button class="btn" id="sample1">Sample 1</button>
+          <button class="btn" id="sample2">Sample 2</button>
+          <button class="btn" id="sample3">Sample 3</button>
+          <button class="btn" id="clearBtn" style="background:#64748b;">Clear</button>
+        </div>
+        <div id="videoError" class="badge" style="display:none;background:#fee2e2;color:#991b1b;">Video load failed (CORS/format)</div>
+        <video id="video" controls></video>
+        <canvas id="hiddenCanvas" style="display:none;"></canvas>
+        <div class="hint">Client-side motion estimate; use ER/corridor CCTV or sample clips. No upload.</div>
+        <div style="margin-top:10px;">
+          <canvas id="motionChart" height="120"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Analysis Report</div>
+        <div id="analysisReport" class="list">
+          <p>Load a video to see motion-based analytics here.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Performance Snapshot</div>
+        <ul class="list">
+          <li>Throughput: 2.2 tasks/s</li>
+          <li>Avg Latency: 0.82s</li>
+          <li>Success Rate: 100%</li>
+        </ul>
+        <a class="back" href="/DSL-Multiagent/index.html">← Back to Home</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // Charts
+      new Chart(document.getElementById('timelineChart'), { type: 'line', data: { labels: ['t0','t1','t2','t3','t4','t5'], datasets: [{ label: 'Patients processed', data: [0, 2, 5, 7, 9, 12], borderColor: '#a855f7', backgroundColor: 'rgba(168,85,247,0.15)', fill: true, tension: 0.25 }] }, options: { responsive: true, plugins:{ legend:{ display:true } }, scales:{ y:{ beginAtZero:true } } } });
+      new Chart(document.getElementById('activityChart'), { type: 'bar', data: { labels: ['Vision','Triage','Routing','ICU','OR'], datasets: [{ label: 'Tasks handled', data: [10, 8, 11, 9, 6], backgroundColor: ['#a855f7','#7c3aed','#c4b5fd','#d8b4fe','#a78bfa'] }] }, options: { responsive:true, plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } } });
+
+      // Triage & allocation
+      const patients = Array.from({length:12}).map((_,i)=>({ id:`P${i+1}`, severity: ['HIGH','MED','LOW'][Math.floor(Math.random()*3)], status:'waiting' }));
+      const ptBody = document.getElementById('patientTable');
+      function renderPatients(){ ptBody.innerHTML = patients.map(p=>`<tr><td>${p.id}</td><td>${p.severity}</td><td>${p.status}</td></tr>`).join(''); }
+      renderPatients();
+      let triaged = 0; const triageStat = document.getElementById('triageStat');
+      const bbItems = document.getElementById('bbItems'); const blackboard = {};
+      document.getElementById('triageNext').addEventListener('click', ()=>{
+        const idx = patients.findIndex(p=>p.status==='waiting'); if(idx<0) return;
+        patients[idx].status = 'triaged'; triaged++; blackboard[`triage@${patients[idx].id}`] = patients[idx];
+        const tText = `⏱️ triaged: ${triaged}/${patients.length}`; triageStat.textContent = tText; triageStat.classList.add('bump'); setTimeout(()=>triageStat.classList.remove('bump'),350); const st=document.getElementById('statusTriage'); if(st){ st.textContent=tText; st.classList.add('bump'); setTimeout(()=>st.classList.remove('bump'),350);} bbItems.textContent = `📋 blackboard: ${Object.keys(blackboard).length}`; renderPatients();
+      });
+      document.getElementById('routeToCT').addEventListener('click', ()=>{
+        const idx = patients.findIndex(p=>p.status==='triaged'); if(idx<0) return; patients[idx].status='to_CT'; renderPatients();
+      });
+
+      let icuBeds = 0, icuUsed = 0; const icuStat=document.getElementById('icuStat'); const allocList=document.getElementById('allocList');
+      function updateICU(){ const text=`🏥 ICU beds: ${icuBeds} · occupied: ${icuUsed}`; icuStat.textContent = text; icuStat.classList.add('bump'); setTimeout(()=>icuStat.classList.remove('bump'),350); const si=document.getElementById('statusICU'); if(si){ si.textContent=text; si.classList.add('bump'); setTimeout(()=>si.classList.remove('bump'),350);} }
+      document.getElementById('spawnBed').addEventListener('click', ()=>{ icuBeds++; allocList.innerHTML = `<li>spawn ICU bed#${icuBeds}</li>` + allocList.innerHTML; updateICU(); });
+      document.getElementById('assignBed').addEventListener('click', ()=>{
+        if(icuUsed<icuBeds){ icuUsed++; allocList.innerHTML = `<li>assign ICU bed → patient</li>` + allocList.innerHTML; updateICU(); }
+      });
+      document.getElementById('cacheSnapshot').addEventListener('click', ()=>{
+        const snap = { ts: Date.now(), icuBeds, icuUsed, triaged }; allocList.innerHTML = `<li>HCMPL cache_store icu_occupancy@t ${JSON.stringify(snap)}</li>` + allocList.innerHTML;
+      });
+
+      // Motion chart with samples
+      const motionCtx = document.getElementById('motionChart');
+      const motionChart = new Chart(motionCtx, { type: 'line', data: { labels: [], datasets: [{ label: 'Motion', data: [], borderColor:'#a855f7', backgroundColor:'rgba(168,85,247,0.15)', fill:true, tension:0.25 }] }, options: { responsive:true, plugins:{ legend:{ display:true } }, scales:{ y:{ beginAtZero:true } } } });
+      const video = document.getElementById('video');
+      const hiddenCanvas = document.getElementById('hiddenCanvas');
+      const fileInput = document.getElementById('videoFile');
+      const urlInput = document.getElementById('videoUrl');
+      const loadUrlBtn = document.getElementById('loadUrlBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const errEl = document.getElementById('videoError');
+      const samples = [
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4'
+      ];
+      function setAndLoad(url){ urlInput.value=url; video.crossOrigin='anonymous'; video.src=url; video.play(); }
+      document.getElementById('sample1').addEventListener('click', ()=>setAndLoad(samples[0]));
+      document.getElementById('sample2').addEventListener('click', ()=>setAndLoad(samples[1]));
+      document.getElementById('sample3').addEventListener('click', ()=>setAndLoad(samples[2]));
+      fileInput.addEventListener('change', () => { const file = fileInput.files && fileInput.files[0]; if (!file) return; video.src = URL.createObjectURL(file); video.play(); });
+      loadUrlBtn.addEventListener('click', () => { const url = urlInput.value.trim(); if (!url) return; setAndLoad(url); });
+      clearBtn.addEventListener('click', () => { video.pause(); video.removeAttribute('src'); video.load(); motionChart.data.labels = []; motionChart.data.datasets[0].data = []; motionChart.update(); document.getElementById('analysisReport').innerHTML = '<p>Cleared. Load a video to analyze.</p>'; });
+      video.addEventListener('error', () => { errEl.style.display = 'block'; });
+      video.addEventListener('loadeddata', () => { errEl.style.display = 'none'; });
+      function analyzeFrame() {
+        if (video.paused || video.ended) return;
+        const ctx = hiddenCanvas.getContext('2d'); hiddenCanvas.width = 160; hiddenCanvas.height = 90;
+        ctx.drawImage(video, 0, 0, 160, 90);
+        const frame = ctx.getImageData(0, 0, 160, 90).data; let motion = 0;
+        if (window._prevFrameData) {
+          for (let i = 0; i < frame.length; i += 4) {
+            const dr = Math.abs(frame[i] - window._prevFrameData[i]);
+            const dg = Math.abs(frame[i+1] - window._prevFrameData[i+1]);
+            const db = Math.abs(frame[i+2] - window._prevFrameData[i+2]);
+            motion += dr + dg + db;
+          }
+          motion = motion / (160 * 90);
+          const t = Math.round(video.currentTime * 10) / 10;
+          motionChart.data.labels.push(`${t}s`);
+          motionChart.data.datasets[0].data.push(Number(motion.toFixed(2)));
+          if (motionChart.data.labels.length > 200) { motionChart.data.labels.shift(); motionChart.data.datasets[0].data.shift(); }
+          motionChart.update('none');
+        }
+        window._prevFrameData = new Uint8ClampedArray(frame);
+        requestAnimationFrame(analyzeFrame);
+      }
+      video.addEventListener('play', () => { window._prevFrameData = null; motionChart.data.labels = []; motionChart.data.datasets[0].data = []; motionChart.update(); requestAnimationFrame(analyzeFrame); });
+    });
+  </script>
+</body>
+</html>

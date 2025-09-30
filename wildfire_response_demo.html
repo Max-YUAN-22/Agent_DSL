@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Wildfire Response - Multi-Agent DSL Demo</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js" defer></script>
+  <script src="realtime-enhancements.js" defer></script>
+  <style>
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Fira Sans", "Droid Sans", "Helvetica Neue", Arial, sans-serif; margin:0; background:#f7f9fc; color:#222; }
+    .container { max-width: 1100px; margin: 0 auto; padding: 24px; }
+    .header { text-align:center; margin-bottom: 16px; }
+    h1 { margin: 8px 0; }
+    .desc { color:#555; }
+    .grid { display:grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap:20px; margin-top: 20px; }
+    .grid3 { display:grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap:16px; }
+    .card, .spec-card { background:#fff; border-radius:12px; padding:16px; box-shadow: 0 8px 20px rgba(0,0,0,0.08); }
+    .title { font-weight:600; margin-bottom:10px; color:#4b6cb7; }
+    .back { display:inline-block; margin-top:12px; text-decoration:none; color:#4b6cb7; font-weight:600; }
+    .list { margin:0; padding-left:18px; color:#444; }
+    canvas { max-width:100%; }
+    .code { background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; overflow:auto; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace; font-size:12px; }
+    .input-row { display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
+    .input-row input[type="text"], .input-row input[type="number"] { padding:8px; border:1px solid #ddd; border-radius:6px; }
+    .btn { padding:8px 12px; border:none; border-radius:6px; background:#4b6cb7; color:#fff; cursor:pointer; font-weight:600; }
+    video { width:100%; max-height:260px; background:#000; border-radius:8px; }
+    .hint { color:#666; font-size:12px; margin-top:6px; }
+    .badge { display:inline-block; padding:6px 10px; border-radius:14px; font-weight:700; font-size:.9em; background:#eef2ff; color:#3730a3; }
+    .metric { display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+    pre.raw { background:#0b1020; color:#e2e8f0; padding:12px; border-radius:8px; max-height:260px; overflow:auto; }
+    .status-strip { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; margin-top:8px; }
+    .emoji { font-size:1.05em; }
+    @keyframes bump { 0%{ transform:scale(1); } 50%{ transform:scale(1.06); } 100%{ transform:scale(1); } }
+    .bump { animation: bump .35s ease; }
+    .toplink { text-align:left; margin-bottom:10px; }
+    .toplink a { color:#4b6cb7; text-decoration:none; font-weight:700; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    @keyframes fire-spread { 0% { background: #ff6b35; } 50% { background: #f7931e; } 100% { background: #ff6b35; } }
+    @keyframes evacuation { 0% { transform: translateX(0); } 100% { transform: translateX(20px); } }
+    .pulse { animation: pulse 2s infinite; }
+    .fire-spread { animation: fire-spread 1s infinite; }
+    .evacuation { animation: evacuation 3s ease-in-out infinite; }
+    .realtime-controls { background: #f8f9fa; padding: 12px; border-radius: 8px; margin: 8px 0; }
+    .auto-play { background: #10b981; }
+    .auto-play:hover { background: #059669; }
+    .status-live { background: #ef4444; color: white; }
+    .status-live::after { content: " ●"; animation: pulse 1s infinite; }
+    @media (max-width: 640px){ canvas{ height:120px !important; } }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <div class="toplink"><a href="/DSL-Multiagent/index.html">← Back to Home</a></div>
+      <h1>Wildfire Response</h1>
+      <div class="desc">Multi-agent coordination for detection, evacuation routing, and resource deployment.</div>
+      <div id="status" class="status-strip">
+        <span class="badge status-live" id="statusSpread">🔥 spread: 0/step</span>
+        <span class="badge" id="statusEvac">🏃‍♂️ evacuation: 0%</span>
+        <span class="badge" id="statusBB">📋 blackboard: 0</span>
+        <span class="badge" id="statusUAV">🚁 UAV: 0 active</span>
+        <span class="badge" id="statusRobots">🤖 robots: 0 deployed</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="title">🎯 Goals · Roles · I/O</div>
+      <div class="grid3">
+        <div class="spec-card">
+          <h4>Goals</h4>
+          <ul class="list">
+            <li>🏃‍♂️ Evacuation efficiency (evacuated / total)</li>
+            <li>🔥 Spread rate (new burning cells / step)</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Roles & Agents</h4>
+          <ul class="list">
+            <li>🚁 UAV: emit fire spread data/images</li>
+            <li>🤖 Ground robots: route evac paths; blackboard share</li>
+            <li>🧑‍💼 Dispatcher: spawn evacuation tasks</li>
+            <li>🏃‍♂️ Evacuees: follow guidance to safe zones</li>
+          </ul>
+        </div>
+        <div class="spec-card">
+          <h4>Inputs / Outputs / Ops</h4>
+          <ul class="list">
+            <li>Inputs: 🔥 spread · 🗺️ map · 👥 positions</li>
+            <li>Outputs: 🚶‍♀️ routes · 💼 resource plan · 📝 feedback</li>
+            <li>Ops: emit → route → blackboard → spawn</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">Response Timeline</div>
+        <canvas id="timelineChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">Agent Activity</div>
+        <canvas id="activityChart" height="140"></canvas>
+      </div>
+
+      <div class="card">
+        <div class="title">DSL Showcase</div>
+        <div class="code"><pre>// ATSLP: Assign detection, routing, evacuation tasks
+schedule_tasks([
+  detect_hotspots(area=A),
+  plan_routes(evac_zone=Z1),
+  deploy_resources(type=BULDOZER)
+])
+
+// HCMPL: Cache and reuse GIS layers
+cache_store(key="risk_map@t", data=compute_risk_map(A))
+risk_map = cache_get(key="risk_map@t")
+
+// CALK: Share knowledge between agents
+broadcast({ alert: "smoke_detected", location: L })</pre></div>
+      </div>
+    </div>
+
+    <div id="interactive" class="grid">
+      <div class="card">
+        <div class="title">Fire Grid Map</div>
+        <div class="realtime-controls">
+          <div class="input-row" style="margin-bottom:8px;">
+            <button class="btn" id="igniteBtn">Ignite Center</button>
+            <button class="btn" id="stepSpreadBtn">Step Spread</button>
+            <button class="btn" id="emitUAVBtn">Emit UAV Data</button>
+            <button class="btn auto-play" id="autoPlayBtn">▶️ Auto Play</button>
+            <button class="btn" id="resetBtn" style="background:#64748b;">Reset</button>
+          </div>
+          <div class="input-row">
+            <span class="badge" id="fireStep">step 0</span>
+            <span class="badge" id="spreadRate">🔥 spread: 0/step</span>
+            <span class="badge" id="simSpeed">Speed: 1x</span>
+            <span class="badge" id="timeElapsed">Time: 00:00</span>
+          </div>
+        </div>
+        <canvas id="fireCanvas" width="600" height="360" style="background:#f1f5f9;border-radius:8px;"></canvas>
+        <div class="metric" style="margin-top:8px;">
+          <span class="badge" id="evacEff">🏃‍♂️ evacuation: 0%</span>
+          <span class="badge" id="blackboardStat">📋 blackboard: 0 items</span>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Evacuation Planner</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <input type="number" id="srcX" placeholder="src x" min="0" max="24" />
+          <input type="number" id="srcY" placeholder="src y" min="0" max="19" />
+          <input type="number" id="dstX" placeholder="dst x" min="0" max="24" />
+          <input type="number" id="dstY" placeholder="dst y" min="0" max="19" />
+          <button class="btn" id="planRouteBtn">Route</button>
+          <button class="btn" id="shareBBBtn">Blackboard Put</button>
+          <button class="btn" id="spawnTaskBtn">Spawn Evac Task</button>
+        </div>
+        <ul class="list" id="routeList"><li>Routes will appear here based on the current risk grid.</li></ul>
+        <pre class="raw" id="uavLog" style="display:none;"></pre>
+      </div>
+
+      <div class="card">
+        <div class="title">CALK Visualization</div>
+        <canvas id="calkChart" height="140"></canvas>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <div class="title">Video Analysis (Beta)</div>
+        <div class="input-row" style="margin-bottom:8px;">
+          <input type="file" id="videoFile" accept="video/*" />
+          <input type="text" id="videoUrl" placeholder="Paste video URL (MP4/MOV/WebM)" />
+          <button class="btn" id="loadUrlBtn">Load</button>
+          <button class="btn" id="sample1">Sample 1</button>
+          <button class="btn" id="sample2">Sample 2</button>
+          <button class="btn" id="sample3">Sample 3</button>
+          <button class="btn" id="clearBtn" style="background:#64748b;">Clear</button>
+        </div>
+        <div id="videoError" class="hint" style="display:none;color:#b91c1c;">Failed to load video (CORS/format). Try another URL or a local file.</div>
+        <video id="video" controls></video>
+        <canvas id="hiddenCanvas" style="display:none;"></canvas>
+        <div class="hint">Client-side motion; no upload.</div>
+        <div style="margin-top:10px;">
+          <canvas id="motionChart" height="120"></canvas>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Analysis Report</div>
+        <div id="analysisReport" class="list">
+          <p>Load a video to see motion-based incident analytics here.</p>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="title">Multi-Agent Collaboration</div>
+        <div id="collabPanel" class="list"><p>Load a video to simulate master–sub agent coordination traces driven by detected events.</p></div>
+      </div>
+
+      <div class="card">
+        <div class="title">Performance Snapshot</div>
+        <ul class="list">
+          <li>Throughput: 2.4 tasks/s</li>
+          <li>Avg Latency: 0.78s</li>
+          <li>Success Rate: 100%</li>
+        </ul>
+        <a class="back" href="/DSL-Multiagent/index.html">← Back to Home</a>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      // 实时功能变量
+      let isAutoPlaying = false;
+      let simulationSpeed = 1;
+      let startTime = Date.now();
+      let simulationInterval;
+      let uavCount = 0;
+      let robotCount = 0;
+      let activeFires = 0;
+      let evacuatedCount = 0;
+      let totalPopulation = 100;
+      let timelineData = { labels: ['t0'], datasets: [{ label: 'Resolved hotspots', data: [0] }] };
+      let activityData = { labels: ['Vision','Routing','Evacuation','Logistics','Comms'], datasets: [{ label: 'Tasks handled', data: [0,0,0,0,0] }] };
+      let calkData = { labels: [0], datasets: [{ label: 'Knowledge consistency', data: [0.1] }] };
+
+      // Timeline
+      timelineChart = new Chart(document.getElementById('timelineChart'), { 
+        type: 'line', 
+        data: timelineData, 
+        options: { 
+          responsive: true, 
+          plugins: { legend: { display: true } }, 
+          scales: { y: { beginAtZero: true } },
+          animation: { duration: 500 }
+        }
+      });
+      
+      // Activity
+      activityChart = new Chart(document.getElementById('activityChart'), { 
+        type: 'bar', 
+        data: activityData, 
+        options: { 
+          responsive: true, 
+          plugins: { legend: { display: false } }, 
+          scales: { y: { beginAtZero: true } },
+          animation: { duration: 500 }
+        }
+      });
+
+      // CALK visualization
+      const calkCtx = document.getElementById('calkChart');
+      calkChart = new Chart(calkCtx, { 
+        type: 'line', 
+        data: calkData, 
+        options: { 
+          responsive: true, 
+          scales: { y: { beginAtZero: true, max: 1 } },
+          animation: { duration: 500 }
+        }
+      });
+
+      // Fire grid map & evacuation
+      const W = 25, H = 20; // grid size
+      const fire = Array.from({length:H},()=>Array(W).fill(0));
+      const safeZones = [{x0:0,y0:0,x1:3,y1:H-1},{x0:W-4,y0:0,x1:W-1,y1:H-1}];
+      const fireCanvas = document.getElementById('fireCanvas');
+      const fctx = fireCanvas.getContext('2d');
+      let fireStep = 0, prevBurning = 0;
+      let evacTotal = 60, evacDone = 0;
+      const blackboard = {};
+      const tasks = [];
+
+      function drawFire(){
+        const cw = fireCanvas.width/W, ch = fireCanvas.height/H;
+        fctx.clearRect(0, 0, fireCanvas.width, fireCanvas.height);
+        
+        // safe zones
+        safeZones.forEach(z=>{ 
+          fctx.fillStyle = 'rgba(16,185,129,0.08)'; 
+          fctx.fillRect(z.x0*cw,z.y0*ch,(z.x1-z.x0+1)*cw,(z.y1-z.y0+1)*ch); 
+        });
+        
+        // fire cells with animation
+        for(let y=0;y<H;y++){
+          for(let x=0;x<W;x++){
+            const v = fire[y][x];
+            let color = v===0?'#e2e8f0': v===1?'#fca5a5': v===2?'#ef4444':'#991b1b';
+            
+            // Add fire animation for burning cells
+            if(v > 0) {
+              const intensity = Math.sin(Date.now() * 0.01 + x + y) * 0.3 + 0.7;
+              if(v === 1) color = `rgba(252, 165, 165, ${intensity})`;
+              else if(v === 2) color = `rgba(239, 68, 68, ${intensity})`;
+              else color = `rgba(153, 27, 27, ${intensity})`;
+            }
+            
+            fctx.fillStyle = color; 
+            fctx.fillRect(x*cw,y*ch,cw-1,ch-1);
+            
+            // Add evacuation paths animation
+            if(evacRoutes.some(route => route.x === x && route.y === y)) {
+              fctx.fillStyle = 'rgba(59, 130, 246, 0.3)';
+              fctx.fillRect(x*cw+2, y*ch+2, cw-5, ch-5);
+            }
+          }
+        }
+        
+        // Draw UAVs
+        for(let i = 0; i < uavCount; i++) {
+          const x = (W/2 + Math.sin(Date.now() * 0.002 + i) * 3) * cw;
+          const y = (H/2 + Math.cos(Date.now() * 0.002 + i) * 2) * ch;
+          fctx.fillStyle = '#3b82f6';
+          fctx.beginPath();
+          fctx.arc(x, y, 4, 0, 2 * Math.PI);
+          fctx.fill();
+        }
+        
+        // Draw robots
+        for(let i = 0; i < robotCount; i++) {
+          const x = (5 + i * 2) * cw;
+          const y = (H - 3) * ch;
+          fctx.fillStyle = '#10b981';
+          fctx.fillRect(x-3, y-3, 6, 6);
+        }
+      }
+      function countBurning(){ let c=0; for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(fire[y][x]>0) c++; return c; }
+      function igniteCenter(){ const cx=Math.floor(W/2), cy=Math.floor(H/2); fire[cy][cx]=2; drawFire(); }
+      function stepSpread(){
+        const next = fire.map(row=>row.slice());
+        for(let y=0;y<H;y++) for(let x=0;x<W;x++) if(fire[y][x]>0){
+          [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx,dy])=>{
+            const nx=x+dx, ny=y+dy; if(nx>=0&&nx<W&&ny>=0&&ny<H){ if(next[ny][nx]<2 && Math.random()<0.35) next[ny][nx]=1; }
+          });
+          next[y][x] = Math.min(3, fire[y][x]+1);
+        }
+        for(let y=0;y<H;y++) for(let x=0;x<W;x++) fire[y][x]=next[y][x];
+        fireStep++; 
+        const burning = countBurning(); 
+        const rate = Math.max(0,burning - prevBurning); 
+        prevBurning = burning;
+        activeFires = burning;
+        
+        // Update evacuation progress
+        if(burning > 0) {
+          evacuatedCount = Math.min(totalPopulation, evacuatedCount + Math.floor(Math.random() * 3) + 1);
+        }
+        
+        updateStatus();
+        updateCharts();
+        drawFire();
+      }
+      
+      function updateStatus() {
+        document.getElementById('fireStep').textContent = `step ${fireStep}`;
+        const spreadText = `🔥 spread: ${Math.max(0, activeFires - prevBurning)}/step`;
+        document.getElementById('spreadRate').textContent = spreadText;
+        document.getElementById('statusSpread').textContent = spreadText;
+        document.getElementById('evacEff').textContent = `🏃‍♂️ evacuation: ${Math.round(evacuatedCount/totalPopulation*100)}%`;
+        document.getElementById('statusEvac').textContent = `🏃‍♂️ evacuation: ${Math.round(evacuatedCount/totalPopulation*100)}%`;
+        document.getElementById('statusUAV').textContent = `🚁 UAV: ${uavCount} active`;
+        document.getElementById('statusRobots').textContent = `🤖 robots: ${robotCount} deployed`;
+        document.getElementById('statusBB').textContent = `📋 blackboard: ${Object.keys(blackboard).length}`;
+        document.getElementById('blackboardStat').textContent = `📋 blackboard: ${Object.keys(blackboard).length} items`;
+        
+        // Update time elapsed
+        const elapsed = Math.floor((Date.now() - startTime) / 1000);
+        const minutes = Math.floor(elapsed / 60);
+        const seconds = elapsed % 60;
+        document.getElementById('timeElapsed').textContent = `Time: ${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+      }
+      
+      function updateCharts() {
+        // Update timeline chart
+        const timeLabel = `t${fireStep}`;
+        if(!timelineData.labels.includes(timeLabel)) {
+          timelineData.labels.push(timeLabel);
+          timelineData.datasets[0].data.push(activeFires);
+          
+          // Keep only last 10 data points
+          if(timelineData.labels.length > 10) {
+            timelineData.labels.shift();
+            timelineData.datasets[0].data.shift();
+          }
+        } else {
+          timelineData.datasets[0].data[timelineData.datasets[0].data.length - 1] = activeFires;
+        }
+        timelineChart.update('none');
+        
+        // Update activity chart
+        activityData.datasets[0].data = [
+          Math.floor(activeFires * 0.3), // Vision
+          Math.floor(evacuatedCount * 0.2), // Routing
+          Math.floor(evacuatedCount * 0.4), // Evacuation
+          Math.floor(robotCount * 2), // Logistics
+          Math.floor(uavCount * 3) // Comms
+        ];
+        activityChart.update('none');
+        
+        // Update CALK chart
+        const knowledgeConsistency = Math.min(0.95, 0.1 + (fireStep * 0.05) + (evacuatedCount / totalPopulation * 0.3));
+        if(!calkData.labels.includes(fireStep)) {
+          calkData.labels.push(fireStep);
+          calkData.datasets[0].data.push(knowledgeConsistency);
+          
+          // Keep only last 15 data points
+          if(calkData.labels.length > 15) {
+            calkData.labels.shift();
+            calkData.datasets[0].data.shift();
+          }
+        } else {
+          calkData.datasets[0].data[calkData.datasets[0].data.length - 1] = knowledgeConsistency;
+        }
+        calkChart.update('none');
+      }
+      // Auto-play functionality
+      function startAutoPlay() {
+        if(isAutoPlaying) return;
+        isAutoPlaying = true;
+        document.getElementById('autoPlayBtn').textContent = '⏸️ Pause';
+        document.getElementById('autoPlayBtn').classList.add('status-live');
+        
+        simulationInterval = setInterval(() => {
+          if(activeFires > 0) {
+            stepSpread();
+            
+            // Randomly deploy UAVs and robots
+            if(Math.random() < 0.3 && uavCount < 3) {
+              uavCount++;
+              blackboard[`uav_${uavCount}`] = { type: 'UAV', status: 'active', timestamp: Date.now() };
+            }
+            
+            if(Math.random() < 0.2 && robotCount < 5) {
+              robotCount++;
+              blackboard[`robot_${robotCount}`] = { type: 'Robot', status: 'deployed', timestamp: Date.now() };
+            }
+            
+            // Add evacuation routes
+            if(Math.random() < 0.4) {
+              evacRoutes.push({
+                x: Math.floor(Math.random() * W),
+                y: Math.floor(Math.random() * H),
+                timestamp: Date.now()
+              });
+            }
+          }
+        }, 2000 / simulationSpeed);
+      }
+      
+      function stopAutoPlay() {
+        isAutoPlaying = false;
+        clearInterval(simulationInterval);
+        document.getElementById('autoPlayBtn').textContent = '▶️ Auto Play';
+        document.getElementById('autoPlayBtn').classList.remove('status-live');
+      }
+      
+      function resetSimulation() {
+        stopAutoPlay();
+        fireStep = 0;
+        activeFires = 0;
+        evacuatedCount = 0;
+        uavCount = 0;
+        robotCount = 0;
+        evacRoutes = [];
+        Object.keys(blackboard).forEach(key => delete blackboard[key]);
+        
+        // Reset fire grid
+        for(let y=0; y<H; y++) {
+          for(let x=0; x<W; x++) {
+            fire[y][x] = 0;
+          }
+        }
+        
+        // Reset charts
+        timelineData.labels = ['t0'];
+        timelineData.datasets[0].data = [0];
+        activityData.datasets[0].data = [0,0,0,0,0];
+        calkData.labels = [0];
+        calkData.datasets[0].data = [0.1];
+        
+        updateStatus();
+        updateCharts();
+        drawFire();
+      }
+      
+      // Event listeners
+      document.getElementById('igniteBtn').addEventListener('click', igniteCenter);
+      document.getElementById('stepSpreadBtn').addEventListener('click', stepSpread);
+      document.getElementById('autoPlayBtn').addEventListener('click', () => {
+        if(isAutoPlaying) {
+          stopAutoPlay();
+        } else {
+          startAutoPlay();
+        }
+      });
+      document.getElementById('resetBtn').addEventListener('click', resetSimulation);
+      
+      // UAV data emission
+      document.getElementById('emitUAVBtn').addEventListener('click', () => {
+        uavCount++;
+        blackboard[`uav_data_${Date.now()}`] = {
+          type: 'UAV_DATA',
+          hotspots: activeFires,
+          timestamp: Date.now(),
+          data: `Fire spread detected: ${activeFires} cells burning`
+        };
+        updateStatus();
+      });
+      
+      // Start with initial state
+      updateStatus();
+      drawFire();
+
+      // Evacuation planner (greedy safest path) + metrics
+      const routeList = document.getElementById('routeList');
+      function cellRisk(x,y){ return fire[y][x]; }
+      function inSafe(x,y){ return safeZones.some(z=> x>=z.x0 && x<=z.x1 && y>=z.y0 && y<=z.y1 ); }
+      function planRoute(sx,sy,dx,dy){
+        const visited = new Set(); const path=[]; let x=sx,y=sy; let iter=0; let hazard=0;
+        while((x!==dx||y!==dy) && iter<400){ iter++; visited.add(`${x},${y}`); path.push([x,y]); hazard += cellRisk(x,y);
+          let best=[x,y], bestScore=Infinity; [[1,0],[-1,0],[0,1],[0,-1]].forEach(([dx1,dy1])=>{
+            const nx=x+dx1, ny=y+dy1; if(nx>=0&&nx<W&&ny>=0&&ny<H&&!visited.has(`${nx},${ny}`)){
+              const score = cellRisk(nx,ny)*2 + Math.hypot(dx-nx,dy-ny)*0.05; if(score<bestScore){ bestScore=score; best=[nx,ny]; }
+            }
+          });
+          if(best[0]===x && best[1]===y) break; x=best[0]; y=best[1];
+        }
+        path.push([dx,dy]);
+        // simulate evacuation success based on path hazard
+        const difficulty = Math.min(0.95, hazard/(path.length+1)/5);
+        const success = 1 - difficulty; const evacInc = Math.max(1, Math.round(5*success));
+        evacDone = Math.min(evacTotal, evacDone + evacInc);
+        const eff = Math.round((evacDone/evacTotal)*100);
+        const evacText = `🏃‍♂️ evacuation: ${eff}%`;
+        const ee=document.getElementById('evacEff'); ee.textContent = evacText; ee.classList.add('bump'); setTimeout(()=>ee.classList.remove('bump'),350);
+        const s2=document.getElementById('statusEvac'); if(s2){ s2.textContent = evacText; s2.classList.add('bump'); setTimeout(()=>s2.classList.remove('bump'),350); }
+        routeList.innerHTML = `<li>Path len: ${path.length} · hazard score: ${hazard}</li><li>Evacuated +${evacInc} → ${evacDone}/${evacTotal}</li><li>Path preview: ${path.slice(0,15).map(p=>`(${p[0]},${p[1]})`).join(' → ')}${path.length>15?' …':''}</li>`;
+        return path;
+      }
+      document.getElementById('planRouteBtn').addEventListener('click', ()=>{
+        const sx=Number(document.getElementById('srcX').value||0), sy=Number(document.getElementById('srcY').value||0);
+        const dx=Number(document.getElementById('dstX').value||W-1), dy=Number(document.getElementById('dstY').value||Math.floor(H/2));
+        planRoute(sx,sy,dx,dy);
+      });
+
+      // Blackboard & spawn/emit
+      const bbStat = document.getElementById('blackboardStat');
+      document.getElementById('shareBBBtn').addEventListener('click', ()=>{
+        const route = routeList.textContent || ''; blackboard[`route@${Date.now()}`]=route; const bbText = `📋 blackboard: ${Object.keys(blackboard).length} items`; bbStat.textContent = bbText; bbStat.classList.add('bump'); setTimeout(()=>bbStat.classList.remove('bump'),350); const s3=document.getElementById('statusBB'); if(s3){ s3.textContent = bbText.replace(' items',''); s3.classList.add('bump'); setTimeout(()=>s3.classList.remove('bump'),350); }
+      });
+      const uavLog = document.getElementById('uavLog');
+      document.getElementById('emitUAVBtn').addEventListener('click', ()=>{
+        uavLog.style.display='block';
+        uavLog.textContent = `[UAV] emit spread@${fireStep} rate=${document.getElementById('spreadRate').textContent}\n` + (uavLog.textContent||'');
+      });
+      document.getElementById('spawnTaskBtn').addEventListener('click', ()=>{
+        const t = { id:`task-${tasks.length+1}`, name:'evacuate_to_safe_zone', created: new Date().toLocaleTimeString()}; tasks.push(t);
+        routeList.innerHTML = `<li>🧑‍💼 spawn ${t.id}: ${t.name} (${t.created})</li>` + routeList.innerHTML;
+      });
+
+      // Initial draw
+      drawFire();
+
+      // Motion analysis & report (existing)
+      const motionCtx = document.getElementById('motionChart');
+      const motionChart = new Chart(motionCtx, { type: 'line', data: { labels: [], datasets: [{ label: 'Motion', data: [], borderColor:'#ef4444', backgroundColor:'rgba(239,68,68,0.15)', fill:true, tension:0.25 }] }, options: { responsive:true, plugins:{ legend:{ display:true } }, scales:{ y:{ beginAtZero:true } } } });
+      const video = document.getElementById('video');
+      const hiddenCanvas = document.getElementById('hiddenCanvas');
+      const fileInput = document.getElementById('videoFile');
+      const urlInput = document.getElementById('videoUrl');
+      const loadUrlBtn = document.getElementById('loadUrlBtn');
+      const clearBtn = document.getElementById('clearBtn');
+      const errEl = document.getElementById('videoError');
+      const samples = [
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/Sintel.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',
+        'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4'
+      ];
+      function setAndLoad(url){ urlInput.value=url; video.crossOrigin='anonymous'; video.src=url; video.play(); }
+      document.getElementById('sample1').addEventListener('click', ()=>setAndLoad(samples[0]));
+      document.getElementById('sample2').addEventListener('click', ()=>setAndLoad(samples[1]));
+      document.getElementById('sample3').addEventListener('click', ()=>setAndLoad(samples[2]));
+      fileInput.addEventListener('change', () => { const file = fileInput.files && fileInput.files[0]; if (!file) return; video.src = URL.createObjectURL(file); video.play(); });
+      loadUrlBtn.addEventListener('click', () => { const url = urlInput.value.trim(); if (!url) return; setAndLoad(url); });
+      clearBtn.addEventListener('click', () => { video.pause(); video.removeAttribute('src'); video.load(); motionChart.data.labels = []; motionChart.data.datasets[0].data = []; motionChart.update(); document.getElementById('analysisReport').innerHTML = '<p>Cleared. Load a video to analyze.</p>'; document.getElementById('collabPanel').innerHTML = '<p>Cleared.</p>'; });
+      video.addEventListener('error', () => { errEl.style.display = 'block'; });
+      video.addEventListener('loadeddata', () => { errEl.style.display = 'none'; });
+
+      function renderReport(times, values) {
+        const reportEl = document.getElementById('analysisReport');
+        if (!times.length) { reportEl.innerHTML = '<p>No data.</p>'; return; }
+        const n = values.length; const avg = values.reduce((a,b)=>a+b,0) / n; let peak=-Infinity, peakIdx=-1; values.forEach((v,i)=>{ if(v>peak){peak=v;peakIdx=i;} });
+        const th = 1.5 * avg; const spans=[]; let s=-1; for(let i=0;i<n;i++){ if(values[i]>th && s===-1) s=i; if((values[i]<=th || i===n-1) && s!==-1){ const e=(values[i]<=th)?i-1:i; spans.push([s,e]); s=-1; } }
+        const spanText = spans.length ? spans.map(([s,e])=>`${times[s]}–${times[e]}`).join(', ') : 'None';
+        reportEl.innerHTML = `<ul><li>Average motion: ${avg.toFixed(2)}</li><li>Peak motion: ${peak.toFixed(2)} at ${times[peakIdx]}</li><li>High-activity segments: ${spanText}</li></ul>`;
+        renderCollaboration(times, values, spans);
+      }
+
+      function renderCollaboration(times, values, spans) {
+        const el = document.getElementById('collabPanel');
+        if (!times.length) { el.innerHTML = '<p>No events detected.</p>'; return; }
+        const lines = [];
+        spans.slice(0,5).forEach(([s,e], idx) => {
+          const tStart = times[s]; const tEnd = times[e];
+          lines.push(`[${tStart}] Master → Vision: detect_hotspots(area=A${idx+1})`);
+          lines.push(`[${tStart}] Vision → Master: smoke_detected at sector S${idx+1}`);
+          lines.push(`[${tEnd}] Master → Routing: plan_routes(evac_zone=Z${idx+1})`);
+          lines.push(`[${tEnd}] Routing → Action: deploy_resources(type=BULDOZER)`);
+          lines.push(`[${tEnd}] Action → Master: task_completed sector S${idx+1}`);
+        });
+        if (!lines.length) { el.innerHTML = '<p>No significant collaboration events (low activity).</p>'; return; }
+        el.innerHTML = `<pre class="code" style="white-space:pre-wrap;">${lines.join('\n')}</pre>`;
+      }
+
+      function analyzeFrame() {
+        if (video.paused || video.ended) return;
+        const ctx = hiddenCanvas.getContext('2d'); hiddenCanvas.width = 160; hiddenCanvas.height = 90;
+        ctx.drawImage(video, 0, 0, 160, 90);
+        const frame = ctx.getImageData(0, 0, 160, 90).data; let motion = 0;
+        if (window._prevFrameData) {
+          for (let i = 0; i < frame.length; i += 4) {
+            const dr = Math.abs(frame[i] - window._prevFrameData[i]);
+            const dg = Math.abs(frame[i+1] - window._prevFrameData[i+1]);
+            const db = Math.abs(frame[i+2] - window._prevFrameData[i+2]);
+            motion += dr + dg + db;
+          }
+          motion = motion / (160 * 90);
+          const t = Math.round(video.currentTime * 10) / 10;
+          motionChart.data.labels.push(`${t}s`);
+          motionChart.data.datasets[0].data.push(Number(motion.toFixed(2)));
+          if (motionChart.data.labels.length > 200) { motionChart.data.labels.shift(); motionChart.data.datasets[0].data.shift(); }
+          motionChart.update('none'); renderReport(motionChart.data.labels, motionChart.data.datasets[0].data);
+        }
+        window._prevFrameData = new Uint8ClampedArray(frame);
+        requestAnimationFrame(analyzeFrame);
+      }
+
+      video.addEventListener('play', () => { window._prevFrameData = null; motionChart.data.labels = []; motionChart.data.datasets[0].data = []; motionChart.update(); requestAnimationFrame(analyzeFrame); });
+    });
+  </script>
+</body>
+</html>
+
+
