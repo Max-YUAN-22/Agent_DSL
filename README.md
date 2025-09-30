@@ -27,13 +27,13 @@ This repository presents a **Multi-Agent Domain-Specific Language (DSL)** framew
 **🌐 [View Live Demo](https://max-yuan-22.github.io/Agent_DSL/)**
 
 ### Demo Scenarios:
-- 🚨 [Emergency Response](https://max-yuan-22.github.io/Agent_DSL/#emergency-response)
-- 🔥 [Wildfire Response](https://max-yuan-22.github.io/Agent_DSL/#wildfire-response)
-- ⚡ [Smart Grid Outage](https://max-yuan-22.github.io/Agent_DSL/#smart-grid-outage)
-- 🏥 [Smart Healthcare](https://max-yuan-22.github.io/Agent_DSL/#smart-healthcare)
-- 🚦 [Traffic Management](https://max-yuan-22.github.io/Agent_DSL/#traffic-management)
-- 🤖 [Warehouse Robotics](https://max-yuan-22.github.io/Agent_DSL/#warehouse-robotics)
-- 🛰️ [Urban Search & Rescue](https://max-yuan-22.github.io/Agent_DSL/#urban-search-rescue)
+- 🚨 [Emergency Response]
+- 🔥 [Wildfire Response]
+- ⚡ [Smart Grid Outage]
+- 🏥 [Smart Healthcare]
+- 🚦 [Traffic Management]
+- 🤖 [Warehouse Robotics]
+- 🛰️ [Urban Search & Rescue]
 
 ## 📈 Performance Results
 
