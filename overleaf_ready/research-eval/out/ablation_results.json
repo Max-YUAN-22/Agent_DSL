@@ -1,0 +1,34 @@
+{
+  "Full": {
+    "throughput_mean": 346.15039162172934,
+    "throughput_std": 4.493442223277893,
+    "avg_latency_ms_mean": 2.889405834674835,
+    "avg_latency_ms_std": 0.037604473829842666,
+    "cache_hit_rate_mean": 0.256,
+    "cache_hit_rate_std": 0.0
+  },
+  "No-ATSLP": {
+    "throughput_mean": 384.1669202981398,
+    "throughput_std": 4.114272211957341,
+    "avg_latency_ms_mean": 2.6033323049545287,
+    "avg_latency_ms_std": 0.027748180227646597,
+    "cache_hit_rate_mean": 0.256,
+    "cache_hit_rate_std": 0.0
+  },
+  "No-HCMPL": {
+    "throughput_mean": 365.79756228849794,
+    "throughput_std": 6.9849912781501295,
+    "avg_latency_ms_mean": 2.734766399860382,
+    "avg_latency_ms_std": 0.05310428995729643,
+    "cache_hit_rate_mean": 0.0,
+    "cache_hit_rate_std": 0.0
+  },
+  "No-CALK": {
+    "throughput_mean": 353.08486899750375,
+    "throughput_std": 12.054748655475471,
+    "avg_latency_ms_mean": 2.8353593349456787,
+    "avg_latency_ms_std": 0.0931825758281175,
+    "cache_hit_rate_mean": 0.256,
+    "cache_hit_rate_std": 0.0
+  }
+}
