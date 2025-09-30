@@ -14,17 +14,22 @@ This repository presents a novel Multi-Agent Domain-Specific Language (DSL) fram
 - **HCMPL** (Hierarchical Cache Management with Pattern Learning) 
 - **CALK** (Collaborative Agent Learning with Knowledge Transfer)
 
-## Website
+## Repository Layout (Core First)
 
-- **Interactive Demo**: `website/` - Complete web interface with real-time monitoring
-- **Frontend**: React-based dashboard with performance visualization
-- **Deployment**: Ready for GitHub Pages deployment
+- `code/` — Core algorithms and DSL implementation (ATSLP, HCMPL, CALK, scheduler, cache, base agent)
+- `data/` — Reproducible datasets and benchmark results
+- `overleaf_ready/` — Paper sources (LaTeX, figures, references) [authoritative figures only]
+- Root site — Static website entry (`index.html` + demo pages) for GitHub Pages
+- `.github/workflows/` — Pages auto-deploy pipeline
+- `appendix/` — Archived legacy demos, historical builds and non-essential assets (e.g., `legacy/`, moved images/figures)
+
+Notes:
+- Figures are de-duplicated. Only `overleaf_ready/figures/images/` is treated as the canonical source of paper figures. Other historical images are archived under `appendix/`.
 
 ## Paper
 
-- **Main Paper**: `FINAL_PAPER_GENERATED.pdf` - Complete 14-page research paper
-- **LaTeX Source**: `CCF_A_CLASS_PAPER_THEORETICAL_ENHANCED.tex` - Source code for the paper
-- **References**: `references.bib` - Bibliography file
+- LaTeX sources and figures are under `overleaf_ready/`
+- Main paper build artifacts (PDF) can be generated from the LaTeX sources
 
 ## Core Implementation
 
@@ -57,6 +62,22 @@ The framework demonstrates significant improvements over existing solutions:
 - **Success Rate**: 98.7% task completion rate
 
 ---
+
+## Contributor Policy
+
+This repository maintains a clean history with a single contributor for provenance. Please keep all commits under:
+
+- `user.name`: `Max-YUAN-22`
+- `user.email`: your GitHub email
+
+Example:
+
+```bash
+git config user.name "Max-YUAN-22"
+git config user.email "you@example.com"
+```
+
+All prior non-essential histories have been archived or restructured to keep a single-contributor record.
 
 ## 🏗️ 真实智慧城市多智能体系统
 
