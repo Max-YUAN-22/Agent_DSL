@@ -63,21 +63,7 @@ The framework demonstrates significant improvements over existing solutions:
 
 ---
 
-# Multi-Agent DSL Framework
-
-A Domain-Specific Language framework for multi-agent collaboration and task allocation across multiple domains.
-
-## 🎯 Core Algorithms
-
-- **ATSLP** (Adaptive Task Scheduling with Load Prediction)
-- **HCMPL** (Hierarchical Coordination with Multi-Path Learning)
-- **CALK** (Collaborative Agent Learning and Knowledge sharing)
-
-## 📊 Live Demo
-
-**🌐 [View Live Demo](https://max-yuan-22.github.io/Multi-agent_DSL2025/)**
-
-### Demo Scenarios
+## 📊 Live Demo Scenarios
 
 1. **🚨 Emergency Response** - Park incident with multi-agent coordination
 2. **🔥 Wildfire Response** - Fire detection, evacuation routing, resource deployment
