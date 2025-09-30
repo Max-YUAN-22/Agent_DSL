@@ -1,5 +1,13 @@
 # Multi-Agent DSL Framework for Intelligent Task Scheduling
 
+### Quick Links
+
+- Live Demo: https://max-yuan-22.github.io/Agent_DSL/
+- Paper (PDF): overleaf_ready/finalpaper.pdf
+- Code: https://github.com/Max-YUAN-22/Agent_DSL
+- Data: data/
+- Repro Steps: REPRODUCIBILITY.md
+
 ## 🌐 Live Demo
 
 **Interactive Website**: [https://max-yuan-22.github.io/Agent_DSL/](https://max-yuan-22.github.io/Agent_DSL/)
@@ -63,47 +71,86 @@ The framework demonstrates significant improvements over existing solutions:
 
 ---
 
-## 📊 Live Demo Scenarios
+## Contributor Policy
 
-1. **🚨 Emergency Response** - Park incident with multi-agent coordination
-2. **🔥 Wildfire Response** - Fire detection, evacuation routing, resource deployment
-3. **⚡ Smart Grid Outage** - Fault isolation, restoration planning, load redistribution
-4. **🏥 Smart Healthcare** - Emergency triage, patient routing, resource allocation
-5. **🚦 Traffic Management** - Incident detection, signal optimization, congestion mitigation
-6. **🤖 Warehouse Robotics** - Task allocation, path planning, collision avoidance
-7. **🛰️ Urban Search & Rescue** - UAV/UGV coordination for victim detection
+This repository maintains a clean history with a single contributor for provenance. Please keep all commits under:
 
-## 📈 Performance Results
+- `user.name`: `Max-YUAN-22`
+- `user.email`: your GitHub email
 
-- **Throughput**: 2.45 tasks/second
-- **Response Time**: 783ms average
-- **Success Rate**: 100% task completion
-- **Improvement**: 43.9% throughput increase over baseline frameworks
+Example:
 
-## 🎮 Interactive Features
+```bash
+git config user.name "Max-YUAN-22"
+git config user.email "you@example.com"
+```
 
-- Real-time performance monitoring
-- Multi-agent coordination visualization
-- DSL primitive demonstrations
-- Cross-scenario orchestration
-- No setup required - fully self-contained
+All prior non-essential histories have been archived or restructured to keep a single-contributor record.
 
-## 📚 Academic Paper
+## 🏗️ 真实智慧城市多智能体系统
 
-Complete research paper available in `overleaf_ready/finalpaper.tex`
+### 🚀 新增功能
 
-## 🔬 Reproducibility
+在原有理论框架基础上，我们实现了一个**真实可用**的智慧城市多智能体协作系统：
 
-All experimental data and results are included in the `data/` directory:
-- `comprehensive_experimental_data.json` - Complete experimental results
-- `real_api_benchmark_results.json` - Real API performance benchmarks
-- `honest_api_benchmark_results.json` - Honest API evaluation results
-- `real_cache_performance.json` - Cache performance metrics
+#### ✅ 完整系统架构
+- **Master Agent（主智能体）**：城市管理核心决策
+- **Sub Agents（子智能体）**：交通🚦、天气🌦️、停车🅿️、安全🔍
+- **真实传感器数据**：支持API接入和高质量模拟
+- **任务跟踪系统**：完整生命周期管理和报告生成
 
-## 🙏 Acknowledgments
+#### 🎯 实际应用场景
+```
+用户: "检测到主干道拥堵，请分析交通状况并提供优化建议"
 
-We thank Professor Hailong Shi from the Institute of Microelectronics, Chinese Academy of Sciences, for his valuable guidance and support throughout this research.
+系统执行流程：
+1. 👑 Master Agent 分析任务并分解
+2. 🚦 交通Agent 获取实时路况数据
+3. 🌦️ 天气Agent 评估天气影响
+4. 🅿️ 停车Agent 分析停车资源
+5. 🔍 安全Agent 评估安全风险
+6. 👑 Master Agent 综合分析生成最终建议
+```
 
-## 📞 Contact
+#### 📊 系统文件
+- `index.html` - 统一前端界面（智能体架构可视化）
+- `smart-city-agents.js` - 核心多智能体系统
+- `api-config.js` - 真实数据API配置管理
+- `task-tracker.js` - 任务跟踪和报告生成
 
-For questions about this research project, please refer to the academic paper or demo documentation.
+#### 🎭 使用方式
+```bash
+# 启动本地服务器
+python3 -m http.server 8080
+
+# 访问系统
+open http://localhost:8080
+```
+
+#### 💡 核心特性
+- **真实vs模拟**：支持真实API，失败时自动降级到高质量模拟数据
+- **可视化协作**：直观展示Master-Sub Agent交互过程
+- **完整报告**：任务执行分析、性能指标、优化建议
+- **企业级架构**：基于ATSLP、HCMPL、CALK的工业级实现
+
+这不是演示系统，而是可以实际部署使用的完整智慧城市管理平台！
+
+---
+
+## Requirements
+
+See `requirements.txt` for Python dependencies.
+
+## License
+
+MIT License - see `LICENSE` file for details.
+
+## Contact
+
+Max Yuan - [Your Email]
+
+## Acknowledgments
+
+We would like to express our sincere gratitude to Prof. Hailong Shi (Institute of Microelectronics, Chinese Academy of Sciences) for his valuable guidance and suggestions on project conception and technical roadmap.
+
+感谢石海龙教授（中科院微电子所）在项目构思和技术路线方面提供的宝贵指导和建议。
