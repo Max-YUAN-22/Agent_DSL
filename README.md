@@ -82,15 +82,6 @@ Refer to `requirements.txt` for Python dependencies.
 
 MIT License - see `LICENSE` for details.
 
-## 🌟 Contributor Policy
-
-Please ensure commits are under:
-
-```bash
-git config user.name "Max-YUAN-22"
-git config user.email "you@example.com"
-```
-
 ## 🙏 Acknowledgments
 
 We would like to express our sincere gratitude to **Professor Hailong Shi** from the Institute of Microelectronics, Chinese Academy of Sciences, for his valuable guidance and suggestions on project conception and technical roadmap.
